@@ -20,6 +20,18 @@ import { renderFailureBadge, initFailureBadges, attachFailureExplanationToJobRow
 let jobsCache = [];
 const pollers = {};
 
+// Round-6 fix: in-flight guard + request-token for refreshJobs so a slow
+// in-flight refresh cannot overwrite the result of a newer refresh
+// (e.g. a 10s-poll racing a manual Refresh, or focus-triggered refresh
+// racing a poll). Each refresh increments the token; when its fetch
+// resolves we only commit the DOM write if the token still matches —
+// otherwise a newer refresh has superseded us and we drop the stale
+// payload silently. We also suppress the eager renderSkeleton() flip
+// when one is already in flight so the table doesn't strobe skeleton↔rows
+// on every overlapping call.
+let _refreshJobsInFlight = false;
+let _refreshJobsToken = 0;
+
 // Track the most recently transitioned job ID so renderJobs() can flash it
 let _flashJobId = null;
 
@@ -112,6 +124,16 @@ export async function refreshSystemStatus() {
 // ─── Refresh Jobs ───
 
 export async function refreshJobs() {
+  // If a refresh is already in flight, don't flip the table back to
+  // skeleton — the previous call's eventual success/failure write will
+  // still apply (whichever finishes last wins, gated by the token check
+  // below). This avoids the skeleton strobe on overlapping refreshes.
+  if (_refreshJobsInFlight) {
+    return;
+  }
+  _refreshJobsInFlight = true;
+  const myToken = ++_refreshJobsToken;
+
   // Show skeleton while loading
   renderSkeleton();
 
@@ -119,6 +141,8 @@ export async function refreshJobs() {
     const res = await apiFetch(endpoints.jobs);
     if (!res.ok) throw new Error("jobs unavailable");
     const data = await res.json();
+    // A newer refresh has superseded us — drop our stale payload silently.
+    if (myToken !== _refreshJobsToken) return;
     jobsCache = Array.isArray(data?.items) ? data.items : Array.isArray(data?.jobs) ? data.jobs : [];
     renderJobs(applyJobFilters(jobsCache));
     updateKPIs(jobsCache);
@@ -126,6 +150,7 @@ export async function refreshJobs() {
     setJobsUpdatedAt(Date.now());
     updateJobsLastUpdatedLabel();
   } catch (_e) {
+    if (myToken !== _refreshJobsToken) return;
     setEngineStatus("Offline", true);
     updateJobsLastUpdatedLabel("Unable to refresh");
     // If cache is empty, show empty state on error
@@ -144,6 +169,10 @@ export async function refreshJobs() {
           if (descEl) descEl.textContent = "Could not load jobs. Check whether the backend is running.";
         }
       }
+    }
+  } finally {
+    if (myToken === _refreshJobsToken) {
+      _refreshJobsInFlight = false;
     }
   }
 }

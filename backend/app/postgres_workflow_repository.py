@@ -282,9 +282,14 @@ class PostgresWorkflowRepository(_PostgresWorkflowRepositoryBase):
             return dict(row) if row else None
 
     def _execute(self, conn, sql: str, params=None):
+        # Round-6 fix: do NOT commit here — let the surrounding
+        # ``self._conn()`` context manager own the commit/rollback
+        # boundary so multi-statement callers (``_ensure_schema``,
+        # ``upsert``) actually share a single transaction. The prior
+        # in-helper commit made every statement self-committing,
+        # defeating atomicity guarantees.
         with conn.cursor() as cur:
             cur.execute(sql, params)
-            conn.commit()
             return cur
 
 
@@ -325,7 +330,12 @@ class Psycopg3WorkflowRepository(_PostgresWorkflowRepositoryBase):
             return dict(zip(cols, row, strict=False))
 
     def _execute(self, conn, sql: str, params=None):
+        # Round-6 fix: do NOT commit here — let the surrounding
+        # ``self._conn()`` context manager own the commit/rollback
+        # boundary so multi-statement callers (``_ensure_schema``,
+        # ``upsert``) actually share a single transaction. The prior
+        # in-helper commit made every statement self-committing,
+        # defeating atomicity guarantees.
         with conn.cursor() as cur:
             cur.execute(sql, params)
-            conn.commit()
             return cur

@@ -14,8 +14,14 @@ export function refreshSettingsPage() {
     apiUrl.textContent = API;
   }
 
-  // Theme mode
-  const saved = localStorage.getItem(THEME_KEY);
+  // Theme mode (guard localStorage — Safari private mode / jsdom can
+  // throw on access, which would otherwise kill the Settings init chain).
+  let saved = null;
+  try {
+    saved = localStorage.getItem(THEME_KEY);
+  } catch {
+    saved = null;
+  }
   const currentMode = saved || "system";
   const toggles = document.querySelectorAll("#settings-theme-toggle .toggle");
   toggles.forEach((t) => {
@@ -25,7 +31,11 @@ export function refreshSettingsPage() {
 
 export function setThemeMode(mode) {
   if (mode === "system") {
-    localStorage.removeItem(THEME_KEY);
+    try {
+      localStorage.removeItem(THEME_KEY);
+    } catch {
+      // localStorage not available
+    }
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     if (isDark) {
       document.documentElement.setAttribute("data-theme", "dark");

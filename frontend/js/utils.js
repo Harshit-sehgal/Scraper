@@ -109,7 +109,15 @@ export function setEnginePolling(active) {
 const THEME_KEY = "dataforge_theme_v1";
 
 export function initTheme() {
-  const preferred = localStorage.getItem(THEME_KEY);
+  // Guard localStorage access — Safari private mode and jsdom test
+  // environments throw on .getItem. Without this guard initTheme()
+  // throws at boot and kills the rest of DOMContentLoaded init.
+  let preferred = null;
+  try {
+    preferred = localStorage.getItem(THEME_KEY);
+  } catch {
+    preferred = null;
+  }
   if (preferred) {
     // User explicitly set a preference — use it
     if (preferred === "dark") {
@@ -125,7 +133,13 @@ export function initTheme() {
     // Listen for OS-level theme changes
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", (_e) => {
-      if (!localStorage.getItem(THEME_KEY)) {
+      let current = null;
+      try {
+        current = localStorage.getItem(THEME_KEY);
+      } catch {
+        current = null;
+      }
+      if (!current) {
         applySystemTheme();
       }
     });

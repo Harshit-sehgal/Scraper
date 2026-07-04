@@ -22,6 +22,12 @@ const PREVIEW_STATUS_BADGE = {
 let selectedWorkflowId = null;
 let runsCache = new Map(); // workflow_id -> {items, fetched_at}
 
+// Round-6 fix: request-token for loadWorkflowDetail so a slow in-flight
+// detail load (or a poller-triggered refresh) can't overwrite the pane
+// for a different workflow the user just clicked. Each call increments
+// the token; the DOM write only commits if the token still matches.
+let _loadDetailToken = 0;
+
 export async function refreshWorkflows() {
   const list = document.getElementById("workflows-list");
   const empty = document.getElementById("workflows-empty-state");
@@ -131,6 +137,7 @@ function renderWorkflowCard(wf) {
 async function loadWorkflowDetail(workflowId) {
   const pane = document.getElementById("workflows-detail-pane");
   if (!pane) return;
+  const myToken = ++_loadDetailToken;
   pane.innerHTML = '<div class="loading">Loading workflow…</div>';
   try {
     const [wfResp, runsResp] = await Promise.all([
@@ -144,8 +151,12 @@ async function loadWorkflowDetail(workflowId) {
       runs = await runsResp.json();
       runsCache.set(workflowId, runs);
     }
+    // A newer detail-load has started (user clicked a different workflow,
+    // or the poller woke) — drop our stale payload silently.
+    if (myToken !== _loadDetailToken) return;
     renderWorkflowDetail(wf, runs);
   } catch (err) {
+    if (myToken !== _loadDetailToken) return;
     pane.innerHTML = `<div class="error">Failed to load workflow: ${escapeHtml(String(err))}</div>`;
   }
 }

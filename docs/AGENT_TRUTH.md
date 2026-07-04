@@ -4523,3 +4523,52 @@ instead of the real `release_context(ctx_id)` via `__aexit__`).
 | TEST-01 | (was) bug | `test_cf_harvester.py` | Rewrote against real `acquire_context` contract (yields `(ctx_id, ctx)` tuple; cleanup via `__aexit__`). |
 
 Verified: `py_compile` clean, ruff clean, 18 cf_harvester tests pass.
+
+---
+
+## Iteration 7 — Transaction boundary + frontend race fixes
+
+Date: 2026-07-04
+
+### Backend: postgres_workflow_repository._execute mid-transaction commit (HIGH)
+
+Both `PostgresWorkflowRepository._execute` (psycopg2) and
+`Psycopg3WorkflowRepository._execute` (psycopg3) called `conn.commit()`
+inside the helper, so every `_execute()` self-committed — defeating the
+`with self._conn() as conn:` context-manager's commit/rollback boundary
+that the base-class methods (`upsert`, `delete`, `delete_by_user`,
+`_ensure_schema`) rely on for atomicity. Multi-statement callers could
+never roll back as a group.
+
+Fix: removed `conn.commit()` from both `_execute` overrides; the
+surrounding `_conn()` context manager continues to own the only commit
+(line 259 psycopg2 / line 159 psycopg3_repository).
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| TXN-01 | HIGH | postgres_workflow_repository.py:284,327 | Removed mid-helper `conn.commit()` so group transactions are atomic. |
+
+Verified: 36 parity/e2e workflow tests pass, ruff clean.
+
+### Frontend race + localStorage hardening (HIGH × 2, MED × 2)
+
+| ID | Severity | File | Fix |
+|----|----------|------|-----|
+| UX-01 | HIGH | frontend/js/jobs.js:114 | `refreshJobs` got an in-flight guard + request-token (`_refreshJobsToken`); overlapping refreshes no longer strobe skeleton↔rows, and stale payloads are dropped silently. |
+| UX-02 | HIGH | frontend/js/workflows.js:131 | `loadWorkflowDetail` got a request-token (`_loadDetailToken`); a slow prior detail load can't overwrite the pane for a different workflow the user clicked. |
+| UX-03 | MED | frontend/js/settings-page.js:18,27 | Wrapped `localStorage.getItem`/`removeItem` in try/catch — Safari private mode / jsdom throws previously killed the Settings init chain. |
+| UX-04 | MED | frontend/js/utils.js:111 | Same guard for `initTheme()` localStorage reads (boot path — without the guard, the whole DOMContentLoaded init throws). |
+
+Verified: frontend build clean (under 200KB first-paint CSS), 458 vitest
+tests pass, eslint + prettier clean. Quick validation gate: passed.
+
+### Frontend findings deferred (lower severity, logged for future)
+
+- `dashboard.js` `refreshDashboard` lacks AbortController (5-fetch race
+  on popstate); pattern is well-understood and a fix would mirror UX-01.
+- `invitations.js` filter snapshot at call start then N+1 sequential
+  awaits — filter dropdown changes during in-flight fetches are dropped.
+- `form.js previewDiscovery` no in-flight guard (stale URL list on
+  rapid double-click).
+- `scheduled-monitoring.js` per-row `_fetchChangesForJob` orphaned
+  fetches after row detach (HTTP pool exhaustion under rapid refresh).
