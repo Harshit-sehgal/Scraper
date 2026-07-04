@@ -11,6 +11,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import sqlite3
@@ -23,6 +24,8 @@ from app.config import settings
 
 if TYPE_CHECKING:
     from fastapi import Request, Response
+
+logger = logging.getLogger(__name__)
 
 SESSION_COOKIE = "dataforge_session"
 SESSION_MAX_AGE = 86400  # 24 hours
@@ -157,7 +160,14 @@ def _derive_secret() -> bytes:
     signing keys. If both are unset, a random per-boot key is generated
     (sessions invalidate on restart).
     """
-    raw = settings.SESSION_SECRET or settings.ADMIN_API_KEY
+    raw = settings.SESSION_SECRET
+    if not raw:
+        logger.warning(
+            "DATAFORGE_SESSION_SECRET is unset; falling back to ADMIN_API_KEY for "
+            "session signing. This is insecure if the admin key is shared or leaked."
+        )
+        raw = settings.ADMIN_API_KEY
+
     if raw:
         return hashlib.sha256(raw.encode("utf-8")).digest()
     return hashlib.sha256(os.urandom(32)).digest()

@@ -71,7 +71,7 @@ _SEMANTIC_PATTERNS_RAW = {
     SemanticType.IDENTIFIER: [
         r"\b[A-Z\-_]+\d+[A-Z\d\-_]*\b",
         r"\b\d+[A-Z\-_]+[A-Z\d\-_]*\b",
-        r"\b[A-Z]{2,}(?:[_-][A-Z0-9]+)+\b",
+        r"\b[A-Z]{2,}[_-][A-Z0-9]+(?:[_-][A-Z0-9]+)*\b",
     ],
     SemanticType.DURATION: [
         r"\d+h\s*\d*m|\d+h$",

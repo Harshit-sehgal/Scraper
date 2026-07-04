@@ -392,7 +392,12 @@ def encrypt(plaintext: str, user_id: str | None = None, key_version_override: st
                     env,
                 )
             else:
-                _fp_salt = f"env={env}:missing-salt"
+                msg = (
+                    f"DATAFORGE_ENCRYPTION_UID_FP_SALT is required for user-id "
+                    f"fingerprinting in env={env!r}. Refusing to use a predictable "
+                    f"dev salt in non-development envs."
+                )
+                raise EncryptionError(msg)
         payload["ufp"] = _hmac_fpr.new(
             _fp_salt.encode("utf-8"),
             user_id.encode("utf-8"),
@@ -464,7 +469,12 @@ def decrypt(encrypted_payload: str, user_id: str | None = None) -> str:
                 if env in {"development", "test"}:
                     _vrf_salt = "dataforge-dev-only-uid-fp-salt-do-not-use-in-prod"
                 else:
-                    _vrf_salt = f"env={env}:missing-salt"
+                    msg = (
+                        f"DATAFORGE_ENCRYPTION_UID_FP_SALT is required for user-id "
+                        f"fingerprinting in env={env!r}. Refusing to use a predictable "
+                        f"dev salt in non-development envs."
+                    )
+                    raise EncryptionError(msg)
             expected_fingerprint = _hmac_vrf.new(
                 _vrf_salt.encode("utf-8"),
                 user_id.encode("utf-8"),

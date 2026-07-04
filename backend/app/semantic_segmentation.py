@@ -229,7 +229,7 @@ DETECTION_PATTERNS = {
     "identifier": [
         r"\b[A-Z\-_]+\d+[A-Z\d\-_]*\b",
         r"\b\d+[A-Z\-_]+[A-Z\d\-_]*\b",
-        r"\b[A-Z]{2,}(?:[_-][A-Z0-9]+)+\b",
+        r"\b[A-Z]{2,}[_-][A-Z0-9]+(?:[_-][A-Z0-9]+)*\b",
     ],
     "organization": [
         r"\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+\b",
@@ -589,7 +589,7 @@ def _classify_fallback(text: str) -> SemanticType:
         return SemanticType.CODE
     if re.fullmatch(r"[A-Z][A-Z0-9]{2,7}", stripped):
         return SemanticType.CODE
-    if re.fullmatch(r"[A-Z]{2,}(?:[_-][A-Z0-9]+)+", stripped):
+    if re.fullmatch(r"[A-Z]{2,}[_-][A-Z0-9]+(?:[_-][A-Z0-9]+)*", stripped):
         return SemanticType.IDENTIFIER
 
     # Number-like (entire string is a number)

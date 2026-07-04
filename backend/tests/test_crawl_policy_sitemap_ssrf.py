@@ -58,9 +58,7 @@ class TestSitemapURLValidationRejectsSSRF:
 
     @pytest.mark.parametrize("url", SSRF_REJECTIONS)
     def test_rejected(self, url: str) -> None:
-        assert _looks_like_valid_sitemap_url(url) is False, (
-            f"URL {url!r} should have been rejected"
-        )
+        assert _looks_like_valid_sitemap_url(url) is False, f"URL {url!r} should have been rejected"
 
 
 class TestSitemapURLValidationAcceptsPublic:
@@ -77,9 +75,7 @@ class TestSitemapURLValidationAcceptsPublic:
         ],
     )
     def test_accepted(self, url: str) -> None:
-        assert _looks_like_valid_sitemap_url(url) is True, (
-            f"URL {url!r} should have been accepted"
-        )
+        assert _looks_like_valid_sitemap_url(url) is True, f"URL {url!r} should have been accepted"
 
 
 class TestSitemapURLValidationEdgeInputs:

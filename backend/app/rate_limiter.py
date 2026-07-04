@@ -249,8 +249,9 @@ _ROUTE_LIMITS: dict[str, tuple[int, float]] = {
     # 15 per minute — network calls
     "/api/discover": (15, 60.0),
     "/api/schema/suggest": (15, 60.0),  # 15 per minute — LLM calls
-    # 5 per minute — expensive diagnostic
+    # 5 per minute — expensive diagnostic + browser launch
     "/api/scraper/diagnostics": (5, 60.0),
+    "/api/scraper/screenshot": (5, 60.0),
     # 20 per minute — ML computation
     "/api/scraper/ml": (20, 60.0),
     # 20 per minute — strategy mutations
@@ -259,6 +260,49 @@ _ROUTE_LIMITS: dict[str, tuple[int, float]] = {
     "/api/jobs": (60, 60.0),
     # 30 per minute — recycle bin mutations
     "/api/recycle_bin": (30, 60.0),
+    # CRIT (RL-2026-07-04): Billing webhook replay/exhaustion guard.
+    # Signed by the provider but does not have a built-in idempotency
+    # dedupe of its own — a leaked signing secret + a flood of signed
+    # replays would otherwise consume webhook CPU + DB writes without
+    # any cap. 10/min is well above PayPal/Stripe's normal replay rate.
+    "/api/billing/webhook": (10, 60.0),
+    # CRIT (RL-2026-07-04): Auth-profile validate triggers a live HTTP
+    # fetch to an operator-stored domain, so it is potentially SSRF-able
+    # without the upstream safe-transport. A 30/min cap throttles even an
+    # attacker that chained a private-IP stored domain with rapid
+    # validation calls — and matches the existing /api/recycle_bin posture.
+    "/api/auth-profiles": (30, 60.0),
+    # HIGH (RL-2026-07-04): Streaming export endpoint (csv/json/excel) and
+    # bulk export — bandwidth + DB-scan cost. 30/min is above any
+    # legitimate per-user UX (manual export cadence is <1/min) but caps
+    # both scrape-style consumers and accidental UI spam.
+    "/api/exports": (30, 60.0),
+    # HIGH (RL-2026-07-04): Workflow run + preview each spawn an agent
+    # or browser — service-tier capacity that an OPERATOR should not be
+    # able to drain with no per-call ceiling.
+    "/api/workflows": (20, 60.0),
+    # HIGH (RL-2026-07-04): SaaS tenant CRUD. Strict-ish cap to keep
+    # ack-sweeps (signup-storm, key-rotation loops) bounded without
+    # impeding legitimate api-key admin work.
+    "/api/saas": (30, 60.0),
+    # MEDIUM (RL-2026-07-04): Login / session-create is a credential
+    # endpoint. 10/min *per-IP* throttles online password-spray while
+    # remaining comfortable for normal (1-2/day) session rolling.
+    # We keep the lower bound on this endpoint because the per-IP
+    # ceiling (100/min) is a poor fit for credential endpoints; the
+    # global 100/min default lets an attacker spray at 1 attempt/sec
+    # from a single IP, which exhausts our PBKDF2 work even before it
+    # breaks a single password.
+    "/api/session": (10, 60.0),
+    # MEDIUM (RL-2026-07-04): Password reset request/confirm are
+    # credential-reset endpoints. 5/min per-IP is intentionally tight —
+    # an attacker spraying reset tokens to enumerate email existence
+    # would otherwise probe at the full per-IP ceiling.
+    "/api/saas/password-reset": (5, 60.0),
+    # MEDIUM (RL-2026-07-04): Template CRUD is admin/operator-only but
+    # not yet capped; 60/min prevents a runaway script from
+    # corrupting the template store via repeated create/delete churn.
+    "/api/templates": (60, 60.0),
 }
 
 
