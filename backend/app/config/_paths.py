@@ -60,6 +60,19 @@ class PathSettings(BaseSettings):
     the middleware's request-time pruning (every 300s) still runs.
     """
 
+    # ─── Binary Download Hardening (FU-2026-07-04) ──────────────────────
+    MAX_BINARY_DOWNLOAD_BYTES: int = 50 * 1024 * 1024
+    """Maximum bytes a single ``download_binary`` call may stream from a
+    remote URL. Defends against OOM/disk-exhaust via attacker-supplied
+    URLs (the inbound ``MAX_BODY_SIZE`` middleware cap does not apply to
+    server-initiated fetches). Defaults to 50 MB.
+    """
+    MAX_HTML_FETCH_BYTES: int = 25 * 1024 * 1024
+    """Maximum bytes the HTML fetcher ('_extract_httpx_body') will accept
+    from an upstream response. Prevents a single hostile page from
+    materializing gigabytes of HTML into worker memory. Defaults to 25 MB.
+    """
+
     # ─── Workflow Storage ───────────────────────────────────────────────
     WORKFLOW_BACKEND: str = "json"
     """CAND-P1-WORKFLOW-STORAGE-001: workflow storage backend.

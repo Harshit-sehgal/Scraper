@@ -568,20 +568,36 @@ def create_exports_router(jobs_store: dict[str, Any]):
         if file_path is None:
             raise HTTPException(status_code=404, detail="Binary file not found")
 
-        # Determine content type
+        # FU-2026-07-04 (C3, H1): determine the serve content-type from
+        # the extension allowlist, NOT from the remote-supplied
+        # ``meta["content_type"]`` (which the remote server chose and may
+        # be ``text/html``, ``image/svg+xml``, etc.). The extension is
+        # already validated against ``_SAFE_BINARY_EXTENSIONS`` at
+        # download time, so we can safely introspect it.
         content_type = "application/octet-stream"
-        if meta:
-            content_type = meta.get("content_type", content_type)
-        guessed, _ = mimetypes.guess_type(filename)
-        if guessed:
-            content_type = guessed
+        extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
+        from app.binary_handler import _EXTENSION_MAP
 
+        mapped_ct = _EXTENSION_MAP.get(f".{extension}")
+        if mapped_ct:
+            content_type = mapped_ct
+        else:
+            guessed, _ = mimetypes.guess_type(filename)
+            if guessed:
+                content_type = guessed
+
+        # Force Content-Disposition: attachment for every binary file
+        # so browsers never attempt inline rendering. The filename is
+        # server-controlled (UUID-safe stem + safe extension) and
+        # the extension is already allowlist-verified — no CRLF/header
+        # injection risk via the extension component.
         return StreamingResponse(
             _iter_binary_file(filename),
             media_type=content_type,
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
                 "Content-Length": str(file_path.stat().st_size),
+                "X-Content-Type-Options": "nosniff",
             },
         )
 

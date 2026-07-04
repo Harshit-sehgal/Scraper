@@ -290,10 +290,15 @@ class TestRoundTrip:
     async def test_download_then_iterate(self) -> None:
         mock_content = b"binary blob bytes for round-trip test"
         mock_response = MagicMock()
-        mock_response.content = mock_content
         mock_response.headers = {"content-type": "application/pdf"}
         mock_response.status_code = 200
         mock_response.aclose = AsyncMock(return_value=None)
+
+        def _iter_bytes(chunk_size: int = 64 * 1024):
+            for pos in range(0, len(mock_content), 64 * 1024):
+                yield mock_content[pos : pos + 64 * 1024]
+
+        mock_response.iter_bytes = _iter_bytes
 
         mock_client = MagicMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)

@@ -659,19 +659,52 @@ async def scrape_url(
     # ── Feat 5: Binary download fast-path ──────────────────────────
     if extract_binary:
         from app.binary_handler import (
-            _detect_content_type_from_url,
+            _detect_extension_from_url,
             download_binary,
-            is_binary_content_type,
         )
 
-        content_type = _detect_content_type_from_url(url)
-        if content_type and is_binary_content_type(content_type):
+        # FU-2026-07-04 (M1): the binary download path must honour the
+        # same crawl-policy governance as the HTML path so operators
+        # cannot bypass per-domain cooldown / robots.txt / retry-delay
+        # enforcement by setting extract_binary=True.
+        policy_result = await _check_crawl_policy(url)
+        if policy_result is not None:
+            return policy_result
+
+        url_ext = _detect_extension_from_url(url)
+        if url_ext and url_ext.lower() in {
+            ".pdf",
+            ".zip",
+            ".gz",
+            ".tar",
+            ".bz2",
+            ".7z",
+            ".rar",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",
+            ".ico",
+            ".mp3",
+            ".mp4",
+            ".ttf",
+            ".woff",
+            ".woff2",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+        }:
             meta = await download_binary(
                 url,
                 headers=headers,
                 cookies=cookies,
                 usage_context=usage_context,
             )
+            # Record the crawl-policy result so per-domain cooldown is updated
+            get_crawl_policy().record_result(url, success=True)
+
             record = {
                 "_binary_file_url": meta["download_url"],
                 "_binary_content_type": meta["content_type"],

@@ -857,7 +857,16 @@ async def _follow_httpx_redirects(client: httpx.AsyncClient, url: str, strategy:
 
 
 async def _extract_httpx_body(resp: httpx.Response, domain: str, anti_bot: Any) -> str:
-    """Extract body from HTTP response with SSRF validation and cookie persistence."""
+    """Extract body from HTTP response with SSRF validation and cookie persistence.
+
+    FU-2026-07-04 (M2): refuse responses whose ``Content-Length`` exceeds the
+    configured MAX_HTML_FETCH_BYTES cap (default 25 MB). A single hostile page
+    with gigabytes of HTML would otherwise OOM the worker. The cap is a
+    last-resort defence — legitimate pages above 25 MB are vanishingly rare.
+    """
+    from app.config import settings
+
+    max_html_bytes = int(getattr(settings, "MAX_HTML_FETCH_BYTES", 25 * 1024 * 1024))
     try:
         resp.raise_for_status()
         final_url = str(resp.url)
@@ -865,6 +874,22 @@ async def _extract_httpx_body(resp: httpx.Response, domain: str, anti_bot: Any) 
         set_cookie = resp.headers.get("set-cookie", "")
         if set_cookie:
             anti_bot.update_cookies(domain, set_cookie)
+
+        # Pre-check Content-Length before materializing the full body
+        cl_header = resp.headers.get("content-length")
+        if cl_header:
+            try:
+                declared = int(cl_header)
+            except ValueError:
+                declared = -1
+            if declared > max_html_bytes:
+                msg = (
+                    f"Content-Length {declared} exceeds "
+                    f"MAX_HTML_FETCH_BYTES ({max_html_bytes}); refusing "
+                    f"to buffer body for {resp.url}"
+                )
+                raise ValueError(msg)
+
         return resp.text
     finally:
         await resp.aclose()

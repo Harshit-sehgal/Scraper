@@ -35,10 +35,13 @@ from app.url_safety import get_safe_async_client, validate_public_http_url
 
 logger = logging.getLogger(__name__)
 
-# ─── Binary content-type detection ─────────────────────────────────────
+# ─── Binary content-type detection (FU-2026-07-04) ──────────────────
 
 # MIME types we consider binary — the scraper should save these as-is
-# rather than trying to parse them as HTML.
+# rather than trying to parse them as HTML. NOTE: this is the *detection*
+# layer only. The persist layer (below) applies an explicit extension +
+# content-type allowlist to prevent attackers from persisting unsafe
+# payloads (e.g. text/html as application/octet-stream, image/svg+xml).
 _BINARY_MIME_PATTERNS: list[re.Pattern] = [
     re.compile(
         r"^application/(pdf|zip|gzip|x-tar|x-bzip2|x-7z-compressed|x-rar-compressed|x-msdownload|vnd\.ms-|x-iso|octet-stream)$",
@@ -55,7 +58,11 @@ _BINARY_MIME_PATTERNS: list[re.Pattern] = [
     re.compile(r"^application/json", re.IGNORECASE),
 ]
 
-# Extension -> content-type mapping for URLs without explicit Content-Type
+# Extension -> content-type mapping for URLs without explicit Content-Type.
+# FU-2026-07-04 (C2): explicitly excludes `image/svg+xml` because SVG can
+# carry executable JS and, served from the same origin, becomes a stored
+# XSS vector. SVG URLs are still detected as binary but rejected by the
+# allowlist below.
 _EXTENSION_MAP: dict[str, str] = {
     ".pdf": "application/pdf",
     ".zip": "application/zip",
@@ -73,7 +80,6 @@ _EXTENSION_MAP: dict[str, str] = {
     ".png": "image/png",
     ".gif": "image/gif",
     ".webp": "image/webp",
-    ".svg": "image/svg+xml",
     ".ico": "image/x-icon",
     ".mp3": "audio/mpeg",
     ".mp4": "video/mp4",
@@ -81,6 +87,63 @@ _EXTENSION_MAP: dict[str, str] = {
     ".woff": "font/woff",
     ".woff2": "font/woff2",
 }
+
+# FU-2026-07-04 (C2): explicit allowlist of extensions safe to persist.
+# Whatever the URL tail or remote Content-Type says, we will only ever
+# write one of these extensions to disk AND serve it back. Excludes
+# .svg (XSS), .html/.htm (XSS), .py/.sh/.exe/.bat/.js (executable),
+# .bin (ambiguous container for any payload).
+_SAFE_BINARY_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".tar",
+        ".bz2",
+        ".7z",
+        ".rar",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".ico",
+        ".mp3",
+        ".mp4",
+        ".ttf",
+        ".woff",
+        ".woff2",
+    },
+)
+
+# FU-2026-07-04 (C2): defence-in-depth content-type denylist. Even if a
+# remote claims one of these (or an extension maps to one), reject
+# before persisting because serving it back would be unsafe.
+_UNSAFE_CONTENT_TYPES: frozenset[str] = frozenset(
+    {
+        # XSS vectors
+        "text/html",
+        "text/xhtml",
+        "application/xhtml+xml",
+        "image/svg+xml",
+        "application/javascript",
+        "application/x-javascript",
+        "text/javascript",
+        # Executable / script
+        "application/x-sh",
+        "application/x-perl",
+        "application/x-python",
+        "application/x-msdos-program",
+        "application/x-msdownload",
+        "application/x-executable",
+        "application/x-mach-binary",
+        "application/x-elf",
+    },
+)
 
 # Thread-safe store for downloaded binary metadata
 _binary_store: dict[str, dict[str, Any]] = {}
@@ -131,31 +194,88 @@ def is_binary_content_type(content_type: str | None) -> bool:
 
 
 def _get_extension_for_content_type(content_type: str) -> str:
-    """Return a suitable file extension for the given content type."""
+    """Return a suitable file extension for the given content type.
+
+    FU-2026-07-04: only resolves to extensions on ``_SAFE_BINARY_EXTENSIONS``.
+    Unsafe content types (text/html, image/svg+xml, application/javascript,
+    ...) and unknown extensions resolve to ``""`` so callers can refuse
+    persistence explicitly rather than silently serving ``.bin``.
+    """
     ct = content_type.split(";", maxsplit=1)[0].strip().lower()
-    # Reverse lookup from _EXTENSION_MAP
+    if ct in _UNSAFE_CONTENT_TYPES:
+        return ""
+    # Reverse lookup from _EXTENSION_MAP (only includes safe extensions now)
     for ext, mime in _EXTENSION_MAP.items():
         if mime == ct:
             return ext
-    # Try mimetypes stdlib
+    # Try mimetypes stdlib — but only accept the resolution if it lands on
+    # the safe allowlist. Without this guard, an attacker-controlled
+    # `application/x-foo` would round-trip to an arbitrary `.foo` extension.
     guessed_ext = mimetypes.guess_extension(ct)
-    if guessed_ext:
+    if guessed_ext and guessed_ext.lower() in _SAFE_BINARY_EXTENSIONS:
         return guessed_ext
-    # Fallback: derive from type
-    if ct.startswith("image/"):
-        return ".img"
-    if ct.startswith("video/"):
-        return ".vid"
-    if ct.startswith("audio/"):
-        return ".aud"
-    if ct.startswith("font/"):
-        return ".fnt"
-    return ".bin"
+    return ""
+
+
+def _resolve_safe_extension(url: str, content_type: str | None) -> str | None:
+    """Pick a safe persistence extension from URL tail OR response content-type.
+
+    FU-2026-07-04 (C2, H3): the persisted filename's extension must come
+    from the allowlist. Either the URL tail or the response content-type
+    may supply it, but only if both the URL is on a safe extension AND the
+    content-type isn't on the unsafe denylist. Returns ``None`` if no
+    safe extension can be derived.
+    """
+    # Try the URL tail first
+    url_ext = _detect_extension_from_url(url)
+    if url_ext and url_ext.lower() in _SAFE_BINARY_EXTENSIONS:
+        # Cross-check the content type — if both URL and content-type
+        # agree on a safe type, accept. If content-type disagrees, fall
+        # through to the content-type path.
+        if content_type:
+            ct_ext = _get_extension_for_content_type(content_type)
+            if ct_ext and ct_ext.lower() == url_ext.lower():
+                return url_ext
+        else:
+            return url_ext
+
+    # Try the content-type
+    if content_type:
+        ct_ext = _get_extension_for_content_type(content_type)
+        if ct_ext and ct_ext.lower() in _SAFE_BINARY_EXTENSIONS:
+            return ct_ext
+
+    return None
+
+
+def _detect_extension_from_url(url: str) -> str | None:
+    """Return the lower-cased file extension from a URL's path component.
+
+    FU-2026-07-04: split from ``_detect_content_type_from_url`` so callers
+    can check the raw extension without doing the content-type lookup
+    (which would silently fail on the unsafe default of ".bin").
+    """
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+    # Find the last `.` after the last `/` to extract the extension.
+    basename = path.rsplit("/", 1)[-1]
+    if "." not in basename:
+        return None
+    candidate = basename.rsplit(".", 1)[-1]
+    if not candidate:
+        return None
+    return f".{candidate}"
 
 
 def _write_binary_file_atomic(save_path: Path, raw_content: bytes) -> None:
-    """Write a binary payload durably via a temporary sibling file."""
-    temp_path = save_path.with_suffix(save_path.suffix + ".tmp")
+    """Write a binary payload durably via a temporary sibling file.
+
+    FU-2026-07-04: legacy helper retained for tests covering the small-
+    payload path. The streaming variant ``_write_binary_file_stream`` is
+    what ``download_binary`` actually uses — this helper still exists to
+    keep the legacy test contract (e.g. writes a known payload to disk).
+    """
+    temp_path = save_path.with_name(save_path.name + ".tmp")
     try:
         with open(temp_path, "wb") as f:
             f.write(raw_content)
@@ -168,6 +288,42 @@ def _write_binary_file_atomic(save_path: Path, raw_content: bytes) -> None:
         raise
 
 
+def _write_binary_file_stream(
+    save_path: Path,
+    resp: httpx.Response,
+    *,
+    max_bytes: int,
+) -> int:
+    """Stream *resp* into a temp sibling of *save_path* with a hard byte cap.
+
+    FU-2026-07-04 (C1): streaming upload caps the in-memory footprint at
+    one chunk regardless of remote body size. Aborts cleanly if the
+    remote delivers more than ``max_bytes``; cleans up the temp file in
+    both error paths.
+
+    Returns the total bytes written.
+    """
+    temp_path = save_path.with_name(save_path.name + ".tmp")
+    try:
+        written = 0
+        with open(temp_path, "wb") as f:
+            for chunk in resp.iter_bytes(chunk_size=64 * 1024):
+                if chunk:
+                    written += len(chunk)
+                    if written > max_bytes:
+                        msg = f"Binary download exceeds {max_bytes}-byte cap (aborted at {written}+ bytes)"
+                        raise ValueError(msg)
+                    f.write(chunk)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, save_path)
+    except (OSError, ValueError):
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+        raise
+    return written
+
+
 async def download_binary(
     url: str,
     *,
@@ -176,6 +332,22 @@ async def download_binary(
     usage_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Download binary content from *url* and save it to the binaries directory.
+
+    FU-2026-07-04 hardening:
+    - **Size cap** (``MAX_BINARY_DOWNLOAD_BYTES``, default 50 MB): the
+      response body is streamed; downloads exceeding the cap abort
+      cleanly and the partial temp file is unlinked. Defends against
+      OOM/disk-exhaust via attacker-supplied URLs (the inbound
+      ``MAX_BODY_SIZE`` middleware cap does not apply to server-initiated
+      fetches).
+    - **Extension allowlist** (``_SAFE_BINARY_EXTENSIONS``): the persisted
+      filename extension must be one of pdf/zip/image/font/audio/etc.
+      extensions explicitly on the allowlist. SVG, HTML, JS, EXE, and
+      ambiguous ``.bin`` payloads are rejected. Both the URL tail and the
+      response Content-Type are checked.
+    - **Content-type denylist** (``_UNSAFE_CONTENT_TYPES``): even if the
+      extension appears safe, a response Content-Type like
+      ``text/html`` or ``image/svg+xml`` is rejected before persistence.
 
     Returns a metadata dict:
 
@@ -190,53 +362,80 @@ async def download_binary(
             "original_url": "https://example.com/report.pdf",
         }
 
-    Raises ``ValueError`` if the URL does not point to binary content.
+    Raises ``ValueError`` if the URL is not safe to persist (mismatched
+    extension, unsafe content-type, or missing binary signature).
     """
     validate_public_http_url(url)
 
-    content_type = _detect_content_type_from_url(url)
-    file_ext = _get_extension_for_content_type(content_type or "application/octet-stream")
+    max_bytes = int(
+        getattr(settings, "MAX_BINARY_DOWNLOAD_BYTES", 50 * 1024 * 1024),
+    )
 
     file_id = f"{uuid.uuid4().hex[:12]}"
-    filename = f"{file_id}{file_ext}"
-    # Sanitize immediately to prevent injection via file_ext
-    filename = _sanitize_filename(filename)
-
     binaries_dir = _get_binaries_dir()
-    save_path = binaries_dir / filename
 
     request_headers = dict(headers or {})
     if cookies:
         cookie_str = "; ".join(f"{k}={v}" for k, v in cookies.items())
         request_headers.setdefault("Cookie", cookie_str)
 
-    async with get_safe_async_client(timeout=httpx.Timeout(60.0), follow_redirects=True) as client:
+    async with get_safe_async_client(
+        timeout=httpx.Timeout(60.0),
+        follow_redirects=True,
+    ) as client:
         resp = await client.get(url, headers=request_headers)
         try:
             resp.raise_for_status()
-            raw_content = resp.content
 
-            # Use the response content-type if available (more accurate than extension guess)
-            actual_ct = resp.headers.get("content-type", "").split(";")[0].strip()
-            if actual_ct:
-                if not is_binary_content_type(actual_ct):
-                    msg = f"URL did not return binary content: {actual_ct}"
+            actual_ct = resp.headers.get("content-type", "").split(";", 1)[0].strip() or None
+
+            # FU-2026-07-04 (C1): cheap Content-Length pre-check before
+            # streaming. A hostile server that declares a 5 GB body is
+            # rejected without buffering a single byte. The streaming
+            # cap below still enforces the limit on responses that lie
+            # about (or omit) Content-Length.
+            cl_header = resp.headers.get("content-length")
+            if cl_header:
+                try:
+                    declared = int(cl_header)
+                except ValueError:
+                    declared = -1
+                if declared > max_bytes:
+                    msg = f"Content-Length {declared} exceeds MAX_BINARY_DOWNLOAD_BYTES ({max_bytes})"
                     raise ValueError(msg)
-                content_type = actual_ct
-                # Recompute extension if the content-type differs from the URL guess
-                ext_from_ct = _get_extension_for_content_type(actual_ct)
-                if ext_from_ct != file_ext:
-                    filename = _sanitize_filename(f"{file_id}{ext_from_ct}")
-                    save_path = binaries_dir / filename
-            elif not is_binary_content_type(content_type):
-                msg = "URL did not return a binary Content-Type"
+
+            # Pick a safe persistence extension from BOTH the URL tail and
+            # the response Content-Type. Refuse persistence if either source
+            # produces an extension outside the allowlist (FU-2026-07-04 /
+            # C2 / H3).
+            file_ext = _resolve_safe_extension(url, actual_ct)
+            if not file_ext:
+                msg = f"URL did not resolve to a safe binary extension (url={url!r}, content_type={actual_ct!r})"
                 raise ValueError(msg)
+
+            # Defence-in-depth — refuse known-unsafe content types even
+            # when the URL-derived extension passed.
+            if actual_ct and actual_ct.lower() in _UNSAFE_CONTENT_TYPES:
+                msg = f"Refusing to persist unsafe content-type {actual_ct!r} from {url!r}"
+                raise ValueError(msg)
+
+            filename = _sanitize_filename(f"{file_id}{file_ext}")
+            save_path = binaries_dir / filename
+            content_type = actual_ct or _EXTENSION_MAP.get(
+                file_ext,
+                "application/octet-stream",
+            )
+
+            # Stream the body to disk with the running byte-cap enforcement.
+            file_size = await asyncio.to_thread(
+                _write_binary_file_stream,
+                save_path,
+                resp,
+                max_bytes=max_bytes,
+            )
         finally:
             await resp.aclose()
 
-        await asyncio.to_thread(_write_binary_file_atomic, save_path, raw_content)
-
-    file_size = len(raw_content)
     download_url = f"/api/download/{filename}"
 
     meta: dict[str, Any] = {

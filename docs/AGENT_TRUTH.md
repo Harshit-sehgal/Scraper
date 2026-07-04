@@ -1,10 +1,8 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-06-29 local time from the working tree.
-Last full validation before this evidence-log edit: `20260629T092611Z_full`
-on HEAD `ea717d63`; 24 command rows passed, 0 failed. The numbered
-harness output showed 23/23 passed because the internal required-paths
-check is logged as command `00_required_paths.md`._
+_Truth source current as of 2026-07-05 local time from the working tree._
+_The most recent session (2026-07-04 CSRF / Rate-Limit / ReDoS / Crypto) is the
+focus entry below — see "Session 93 - CSRF + Rate-Limit + ReDoS + Crypto"._
 
 This file is an index to fresh command evidence, not proof by itself.
 Reproduce commands or inspect the cited logs before relying on any claim.
@@ -12,6 +10,72 @@ Reproduce commands or inspect the cited logs before relying on any claim.
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 93 - CSRF + Rate-Limit + ReDoS + Crypto (2026-07-04)
+
+Scope: close all gaps surfaced by the three-agent security audit run at the
+end of session 92 (rate-limiter route coverage, ReDoS, crypto production
+fences) plus a fresh defense-in-depth CSRF origin-validation middleware.
+
+### Issues Fixed (commit `3d75aec0`)
+
+- `CSRF-2026-07-04`: New `origin_validation_middleware` in
+  `backend/app/middlewares.py` (`_STATEFUL_METHODS` and
+  `_SKIPPED_AUTH_CONTEXTS` constants). Gated to production/staging envs,
+  applies only to state-changing methods on `/api/` paths, skips
+  API-key-authenticated requests (form-based CSRF cannot inject custom
+  headers), and validates Origin/Referer against `CORS_ORIGINS`. Registered
+  in `main.py.configure_middleware()` after `api_key_middleware` so
+  `resolve_auth_context()` reflects the resolved auth source. 18 tests in
+  `tests/test_csrf_origin_validation.py` covering env gating, method
+  filter, path filter, Origin/Referer accept+reject, and API-key skip paths.
+  All 18 pass.
+- `RL-2026-07-04`: Extended `_ROUTE_LIMITS` with 9 new explicit entries for
+  previously-unprotected routes — billing webhook (10/min, brute-force
+  critical), screenshots (5/min), auth-profiles (30/min), exports (30/min),
+  workflows (20/min), saas (30/min), session login (10/min, brute-force),
+  password-reset (5/min, brute-force), templates (60/min). Longest-prefix
+  match wins via sorted-by-len-desc keys; falls back to `"default"` cap.
+- `ReDOS-2026-07-04`: Replaced nested-quantifier pattern
+  `[A-Z]{2,}(?:[_-][A-Z0-9]+)+` with the non-backtracking equivalent
+  `[A-Z]{2,}[_-][A-Z0-9]+(?:[_-][A-Z0-9]+)*` in `semantic_segmentation.py`
+  (2 sites) and `semantic_mapper.py` (1 site). The `[A-Z]{2,}[\s+(?:...)]`
+  pattern in `semantic_segmentation.py:235` is disambig-safe (the `\s+`
+  and `[A-Z]` classes are disjoint) so a noqa comment was added rather than
+  a rewrite. 4 sites total; 3 rewritten, 1 annotated.
+- `CHK-2026-07-04`: Two production-fence fixes in
+  `backend/app/utils/encryption.py` — `encrypt()` `_fp_salt` and `decrypt()`
+  `_vrf_salt` now raise `EncryptionError` in non-dev environments instead of
+  silently constructing predictable derivation material
+  (`env={env}:missing-salt`). Dev/test behavior unchanged (uses the hardcoded
+  `_DEFAULT_PER_USER_SALT` baseline). `auth/session.py:_derive_secret()`
+  now logs an explicit warning when `SESSION_SECRET` is unset; the fallback
+  chain (SESSION_SECRET → ADMIN_API_KEY → per-boot random) is preserved but
+  logged loudly. Deeper HMAC(key=user_id+salt, data=salt) construction and
+  SESSION_SECRET minimum-length validation were noted as future-hardening
+  items; the lazy/random fallback already makes the worst case
+  user-session-confusion-only on shared ADMIN_API_KEY.
+
+### Verification
+
+- `python -m pytest tests/test_csrf_origin_validation.py -q` → 18/18 pass.
+- Wider regression blotter (`test_csrf_origin_validation.py`,
+  `test_notification_channel_ssrf.py`, `test_crawl_policy_sitemap_ssrf.py`,
+  `test_rbac_can_access_scoped.py`) → 100% pass.
+- `python -m mypy app/main.py` → clean (no attribute-defined errors).
+- Pre-commit hooks (ruff, ruff-format, bandit, mypy) → pass after auto-fix
+  roundtrip.
+
+### Still Open
+
+- Task #17 (MEDIUM-tier flaky tests) remains pending.
+- Three fresh parallel gap-hunt agents launched at end of session
+  (file-upload hardening, auth+info-disclosure, TOCTOU/concurrency). Reports
+  to be processed in the next session.
+- File-upload binary_handler pull (size cap, extension allowlist, MIME
+  sniffing) is the next high-leverage follow-on per the prior audit.
+
+---
 
 ## 2026-06-29/30 - Full Validation Repair Pass
 
