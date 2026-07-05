@@ -37,7 +37,9 @@ class TestScheduleBackgroundTask:
         # Awaiting the task will re-raise, so use exception() instead.
         import asyncio
 
-        await asyncio.sleep(0.01)
+        # Yield to the loop so the broken coroutine raises, then check
+        # the stored exception. No real sleep needed.
+        await asyncio.sleep(0)
         exc = task.exception()
         assert exc is not None
         assert "missing attr" in str(exc)
@@ -77,7 +79,9 @@ async def test_schedule_background_task_cancelled_does_not_raise() -> None:
 
     task = schedule_background_task(never_completes())
     task.cancel()
-    await asyncio.sleep(0.01)  # Let cancellation propagate
+    # Yield once so the cancellation delivery runs on the loop; no real
+    # sleep needed because cancel() schedules the cancellation immediately.
+    await asyncio.sleep(0)
     # No exception should propagate
 
 

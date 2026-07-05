@@ -57,8 +57,12 @@ async def test_field_wave_propagation() -> None:
         # We manually trigger a wave to ensure it's not decayed by evolve during setup
         ws._topology.emit_field_wave(rid_a, 0.7)
 
-    # Give some time for background tasks/dispatcher if any (though currently sync)
-    await asyncio.sleep(0.1)
+    # Poll briefly for wave to propagate (background tasks may be async)
+    for _ in range(50):
+        region_b_final = ws._topology.get_region(rid_b)
+        if region_b_final is not None and region_b_final.instability > initial_instability_b:
+            break
+        await asyncio.sleep(0)
 
     # 3. Verify Region B absorbed the wave
     region_b_final = ws._topology.get_region(rid_b)
@@ -99,7 +103,13 @@ async def test_wave_causal_chain() -> None:
 
     # We need to run the scheduler step to process the second hop
     ws.process_cognitive_queue(budget_ms=100)
-    await asyncio.sleep(0.1)
+
+    # Poll briefly for the absorption wave to propagate
+    for _ in range(50):
+        region_c = ws._topology.get_region(rc.region_id)
+        if region_c is not None and region_c.instability > 0.1:
+            break
+        await asyncio.sleep(0)
 
     # Verify C absorbed a wave
     region_c = ws._topology.get_region(rc.region_id)
