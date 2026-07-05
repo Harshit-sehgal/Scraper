@@ -282,6 +282,41 @@ class JSONFileStore:
         self._read_modify_write(_mutate)
         return captured[0]
 
+    def transform(
+        self,
+        record_id: str,
+        fn: Callable[[dict[str, Any]], dict[str, Any] | None],
+    ) -> dict[str, Any] | None:
+        """Atomically transform a record inside the read-modify-write lock.
+
+        *fn* receives the current record (a deep copy — safe to mutate
+        freely) and must return the new dict to store, or ``None`` to
+        leave the record unchanged / delete it.
+
+        Returns the post-transform record or ``None`` if *fn* returned
+        ``None``.  Returns ``None`` when the record does not exist
+        (the callback is never invoked).
+
+        FU-2026-07-06: closes the TOCTOU on counter fields (``total_runs``,
+        ``version``) in the workflow routes — the caller's ``fn`` reads
+        and increments the counter inside the store's flock, so two
+        concurrent ``POST /workflows/{id}/run`` or ``PUT /workflows/{id}``
+        cannot both read N and both write N+1.
+        """
+        captured: list[dict[str, Any] | None] = [None]
+
+        def _mutate(s: dict[str, dict[str, Any]]) -> None:
+            existing = s.get(record_id)
+            if existing is None:
+                return
+            transformed = fn(dict(existing))
+            if transformed is not None:
+                s[record_id] = transformed
+            captured[0] = transformed
+
+        self._read_modify_write(_mutate)
+        return captured[0]
+
     def clear_all(self) -> int:
         prior: list[int] = [0]
 

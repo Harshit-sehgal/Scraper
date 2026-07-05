@@ -22,6 +22,7 @@ import logging
 import sqlite3
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -161,6 +162,30 @@ class WorkflowRepository(ABC):
     def health_check(self) -> dict[str, Any]:
         """Return a health dict with at least ``backend`` and ``ok`` keys."""
 
+    def transform(
+        self,
+        workflow_id: str,
+        fn: Callable[[dict[str, Any]], dict[str, Any] | None],
+    ) -> dict[str, Any] | None:
+        """Atomically transform a workflow inside the store's lock.
+
+        Default implementation: ``get`` + callback + ``upsert``.
+        Backends with native atomic read-modify-write SHOULD override
+        this to hold the store lock across the full read-transform-
+        write span, so concurrent counter bumps on the same workflow
+        id do not race.
+
+        Returns the post-transform record, or ``None`` if *fn* returned
+        ``None`` / the record does not exist.
+        """
+        existing = self.get(workflow_id)
+        if existing is None:
+            return None
+        transformed = fn(dict(existing))
+        if transformed is not None:
+            self.upsert(workflow_id, transformed)
+        return transformed
+
 
 # ── JSON adapter (default, backward-compatible) ──────────────────────────
 
@@ -216,6 +241,14 @@ class JsonWorkflowRepository(WorkflowRepository):
 
     def upsert(self, workflow_id: str, record: dict[str, Any]) -> None:
         self._store.upsert(workflow_id, record)
+
+    def transform(
+        self,
+        workflow_id: str,
+        fn: Callable[[dict[str, Any]], dict[str, Any] | None],
+    ) -> dict[str, Any] | None:
+        """Atomic read-transform-write under the JSONFileStore lock."""
+        return self._store.transform(workflow_id, fn)
 
     def delete(self, workflow_id: str) -> bool:
         return self._store.delete(workflow_id)

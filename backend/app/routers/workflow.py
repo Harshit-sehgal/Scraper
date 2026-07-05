@@ -443,11 +443,17 @@ async def update_workflow(
     ],
 ):
     """Update an existing workflow. Only provided fields are changed."""
-    existing = _get_visible_workflow(workflow_id, auth)
+    # Read current state for validation.  We snapshot the workflow
+    # via _get_visible_workflow to resolve access control and get the
+    # current name (needed for logging); the counter bump happens
+    # atomically inside transform() so two concurrent PUTs don't both
+    # read version=N and both write N+1 (FU-2026-07-06).
+    snapshot = _get_visible_workflow(workflow_id, auth)
     update_data = req.model_dump(exclude_unset=True)
 
-    # URL-safety guard (R-012): validate any new start_url / original_url
-    # before persisting, matching the create route and the draft routes.
+    # URL-safety guard (R-012): validate new start_url / original_url
+    # before the atomic write — the check is synchronous (no I/O) and
+    # doesn't depend on the store state, so it stays outside the lock.
     for _url_field in ("start_url", "original_url"):
         _new_url = update_data.get(_url_field)
         if _new_url:
@@ -456,25 +462,37 @@ async def update_workflow(
             except ValueError as exc:
                 logger.warning("Workflow URL validation failed on update: %s", exc)
                 raise HTTPException(
-                    status_code=400, detail="Unsafe workflow URL: does not meet public-host requirements"
+                    status_code=400,
+                    detail="Unsafe workflow URL: does not meet public-host requirements",
                 ) from exc
 
-    for key, value in update_data.items():
-        if value is not None:
-            existing[key] = value
+    # Build the merge dict of non-None fields
+    non_none = {k: v for k, v in update_data.items() if v is not None}
+    now = _now_iso()
 
-    existing["updated_at"] = _now_iso()
-    existing["version"] = existing.get("version", 1) + 1
+    # Atomically apply the field updates + version bump
+    repo = _get_workflow_repo()
+    result = repo.transform(
+        workflow_id,
+        lambda rec: {
+            **rec,
+            **non_none,
+            "version": rec.get("version", 1) + 1,
+            "updated_at": now,
+        },
+    )
+    if result is None:
+        logger.warning("Workflow %s disappeared mid-update — was deleted concurrently", workflow_id)
+        raise HTTPException(status_code=404, detail="Workflow not found")
 
-    _write_back(existing)
     logger.info("Workflow updated: %s", workflow_id)
     log_job_event(
         actor=auth[1],
         action="workflow_updated",
         job_id=workflow_id,
-        details={"name": existing.get("name")},
+        details={"name": snapshot.get("name")},
     )
-    return existing
+    return result
 
 
 @router.patch("/{workflow_id}", status_code=200, response_model=dict)
@@ -527,14 +545,25 @@ async def run_workflow(
     wf = _get_visible_workflow(workflow_id, auth)
     _role, user_id, org_id, project_id = auth
 
-    # Update run counters
-    wf["total_runs"] = wf.get("total_runs", 0) + 1
-    wf["last_run_at"] = _now_iso()
-
-    # Generate a job ID for tracking
+    # Generate job ID for tracking (outside the lock — uuid4 is
+    # constant-time, no I/O).
     job_id = str(uuid.uuid4())
-    wf["last_run_job_id"] = job_id
-    _write_back(wf)
+    now = _now_iso()
+
+    # Atomically bump the run counters inside the store's
+    # read-modify-write so two concurrent POST /workflows/{id}/run
+    # do not both read N and both write N+1 (FU-2026-07-06).
+    repo = _get_workflow_repo()
+    repo.transform(
+        workflow_id,
+        lambda rec: {
+            **rec,
+            "total_runs": rec.get("total_runs", 0) + 1,
+            "last_run_at": now,
+            "last_run_job_id": job_id,
+            "updated_at": now,
+        },
+    )
 
     # Record the run in the dedicated run-history store so the
     # UI can show a chronological list. We snapshot the workflow
@@ -550,7 +579,7 @@ async def run_workflow(
         "org_id": org_id,
         "project_id": project_id,
         "status": "queued",
-        "queued_at": _now_iso(),
+        "queued_at": now,
     }
     _workflow_runs.upsert(run_id, run_record)
 
