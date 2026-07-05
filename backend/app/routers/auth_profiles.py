@@ -256,6 +256,12 @@ async def complete_login(
     _write_back(profile)
 
     logger.info("Auth profile login completed: %s for domain %s", profile_id, profile.get("domain"))
+    log_admin_action(
+        actor=user_id or "system",
+        action="auth_profile_login_completed",
+        resource=profile_id,
+        details={"domain": profile.get("domain", "")},
+    )
     return _safe_profile(profile)
 
 

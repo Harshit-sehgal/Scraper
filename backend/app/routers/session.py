@@ -58,6 +58,15 @@ async def create_session(
         project_id=context.project_id,
     )
 
+    from app.audit_logger import log_job_event
+
+    log_job_event(
+        actor=context.user_id or "anonymous",
+        action="session_created",
+        job_id=f"session:{context.user_id}",
+        outcome="success",
+    )
+
     return {
         "status": "ok",
         "role": context.role.value,
@@ -73,6 +82,16 @@ async def destroy_session(request: Request, response: Response):
     if cookie:
         revoke_session_cookie(cookie)
     clear_session_cookie(response)
+
+    from app.audit_logger import log_job_event
+
+    log_job_event(
+        actor="anonymous",
+        action="session_destroyed",
+        job_id="session:logout",
+        outcome="success",
+    )
+
     return {"status": "ok", "message": "Session cookie cleared."}
 
 
