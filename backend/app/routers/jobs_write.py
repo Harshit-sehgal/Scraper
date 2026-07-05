@@ -313,7 +313,7 @@ async def _restore_job_logic(
         logger.exception("Failed to restore job %s from recycle bin in repository", job_id)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to restore job: {e}",
+            detail="Job restoration failed. The server encountered an unexpected error. This has been logged.",
         ) from e
     with manager.lock:
         if job_id in manager.recycle_bin_store:
@@ -336,7 +336,7 @@ async def _hard_delete_job_logic(
         logger.exception("Failed to hard-delete job %s from repository", job_id)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to permanently delete job: {e}",
+            detail="Job permanent deletion failed. The server encountered an unexpected error. This has been logged.",
         ) from e
     with manager.lock:
         manager.recycle_bin_store.pop(job_id, None)
@@ -445,7 +445,11 @@ def register_jobs_write_routes(
                 max_per_domain=req.max_per_domain,
             )
         except DiscoveryDependencyError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            logger.warning("Discovery service unavailable for job creation: %s", exc)
+            raise HTTPException(
+                status_code=503,
+                detail="Discovery service temporarily unavailable. Please try again later.",
+            ) from exc
         from app.url_safety import validate_public_http_url
 
         safe_results = []

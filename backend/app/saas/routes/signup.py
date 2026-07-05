@@ -88,7 +88,8 @@ async def signup(body: SignupRequest, request: Request) -> SignupResponse:
             detail="Cannot complete signup at this time. Please try a different email address or contact support.",
         ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        logger.info("Signup validation failed: %s", exc)
+        raise HTTPException(status_code=422, detail="Invalid signup information") from exc
 
     log_job_event(
         actor=result.user.id,

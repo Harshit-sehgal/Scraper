@@ -14,9 +14,12 @@ URL-safety check consults before every scrape.
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field
 
 from app.admin_denylist import DenylistEntry, get_denylist
@@ -85,7 +88,8 @@ async def add_denylist_entry(
             path_prefix=body.path_prefix,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        logger.warning("Domain denylist validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid denylist entry") from exc
     log_admin_action(
         actor=user_id,
         action="denylist_add",

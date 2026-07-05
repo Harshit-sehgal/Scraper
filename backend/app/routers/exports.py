@@ -420,7 +420,8 @@ def create_exports_router(jobs_store: dict[str, Any]):
         try:
             body = export_service.build_csv_bytes(job)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            logger.warning("Export format conversion failed: %s", exc)
+            raise HTTPException(status_code=400, detail="Export format conversion failed") from exc
         sig = sign_export_payload(job_id, "csv", body)
         return StreamingResponse(
             iter([body]),
@@ -477,7 +478,8 @@ def create_exports_router(jobs_store: dict[str, Any]):
         try:
             body = export_service.build_json_bytes(job)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            logger.warning("Export format conversion failed: %s", exc)
+            raise HTTPException(status_code=400, detail="Export format conversion failed") from exc
         sig = sign_export_payload(job_id, "json", body)
         return StreamingResponse(
             iter([body]),
@@ -524,12 +526,14 @@ def create_exports_router(jobs_store: dict[str, Any]):
                     load_paginated_job_results_from_disk,
                 )
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+                logger.warning("Export format conversion failed: %s", exc)
+                raise HTTPException(status_code=400, detail="Export format conversion failed") from exc
         else:
             try:
                 content_bytes = await run_in_threadpool(export_service.build_excel_bytes, job)
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+                logger.warning("Export format conversion failed: %s", exc)
+                raise HTTPException(status_code=400, detail="Export format conversion failed") from exc
 
         sig = sign_export_payload(job_id, "excel", content_bytes)
         return StreamingResponse(

@@ -304,7 +304,11 @@ async def create_workflow_from_manual_mapping(
     try:
         validate_public_http_url(start_url)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"Unsafe workflow start URL: {exc}") from exc
+        logger.warning("Unsafe workflow start URL: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Unsafe workflow start URL: does not meet public-host requirements",
+        ) from exc
 
     steps = steps_from_manual_mapping(
         start_url=start_url,
@@ -357,7 +361,10 @@ async def create_workflow(
             try:
                 validate_public_http_url(_url.strip())
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+                logger.warning("Workflow URL validation failed: %s", exc)
+                raise HTTPException(
+                    status_code=400, detail="Unsafe workflow URL: does not meet public-host requirements"
+                ) from exc
     wf = Workflow(  # type: ignore[call-arg]
         name=req.name.strip(),
         description=req.description.strip() if req.description else "",
@@ -447,7 +454,10 @@ async def update_workflow(
             try:
                 validate_public_http_url(str(_new_url).strip())
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+                logger.warning("Workflow URL validation failed on update: %s", exc)
+                raise HTTPException(
+                    status_code=400, detail="Unsafe workflow URL: does not meet public-host requirements"
+                ) from exc
 
     for key, value in update_data.items():
         if value is not None:
