@@ -76,6 +76,7 @@ from app.storage_interface import get_job_repository
 from app.utils.rbac import (
     UserRole,
     can_access_scoped_resource,
+    get_current_user,
     require_principal,
     require_role,
 )
@@ -501,6 +502,21 @@ def register_jobs_write_routes(
         service = JobCreationService(manager)
         try:
             result = await service.create_job(job_data, request)
+            _role2, actor_id = get_current_user(request)  # login-required route
+            actor = actor_id or "system"
+            log_job_event(
+                actor=actor,
+                action="job_created",
+                job_id=result.job_id,
+                outcome="success",
+                details={
+                    "name": job_data.name,
+                    "mode": job_data.mode,
+                    "topic": job_data.topic or "",
+                    "url_count": len(job_data.urls or []),
+                    "idempotent_replay": result.idempotent_replay,
+                },
+            )
             return {
                 "id": result.job_id,
                 "job_id": result.job_id,
@@ -524,7 +540,14 @@ def register_jobs_write_routes(
         """
         role, user_id, org_id, project_id = _auth_tuple(auth)
         service = JobCancellerService(manager)
-        return await service.cancel_job(job_id, role, user_id, org_id, project_id)
+        result = await service.cancel_job(job_id, role, user_id, org_id, project_id)
+        log_job_event(
+            actor=user_id or "system",
+            action="job_cancelled",
+            job_id=job_id,
+            outcome="success",
+        )
+        return result
 
     @router.post("/api/jobs/{job_id}/reclean", response_model=dict)
     async def reclean_job(
@@ -540,7 +563,14 @@ def register_jobs_write_routes(
         """
         role, user_id, org_id, project_id = _auth_tuple(auth)
         service = JobRecleanerService(manager)
-        return await service.reclean_job(job_id, role, user_id, org_id, project_id)
+        result = await service.reclean_job(job_id, role, user_id, org_id, project_id)
+        log_job_event(
+            actor=user_id or "system",
+            action="job_recleaned",
+            job_id=job_id,
+            outcome="success",
+        )
+        return result
 
     @router.patch("/api/jobs/{job_id}/headers", response_model=StatusResponse)
     async def update_job_headers(
@@ -554,7 +584,7 @@ def register_jobs_write_routes(
         """Update custom request headers and cookies for a job."""
         role, user_id, org_id, project_id = _auth_tuple(auth)
         service = JobHeadersService(manager)
-        return await service.update_headers(
+        result = await service.update_headers(
             job_id,
             role,
             user_id,
@@ -563,6 +593,13 @@ def register_jobs_write_routes(
             headers=body.headers,
             cookies=body.cookies,
         )
+        log_job_event(
+            actor=user_id or "system",
+            action="job_headers_updated",
+            job_id=job_id,
+            outcome="success",
+        )
+        return result
 
     @router.patch("/api/jobs/{job_id}/webhook")
     async def update_job_webhook(
@@ -620,6 +657,12 @@ def register_jobs_write_routes(
         if success:
             repo = get_job_repository()
             await run_in_threadpool(repo.save_single, job)
+        log_job_event(
+            actor=user_id or "system",
+            action="job_webhook_redelivered",
+            job_id=job_id,
+            outcome="success" if success else "failed",
+        )
         return {"job_id": job_id, "delivered": success}
 
     @router.patch("/api/jobs/{job_id}/strategy", response_model=StatusResponse)
@@ -895,7 +938,14 @@ def register_jobs_write_routes(
             from app.services.job_mutation_service import _ensure_job_write_access
 
             _ensure_job_write_access(manager.recycle_bin_store[job_id], role, user_id, org_id, project_id, "restore_job")
-        return await _restore_job_logic(manager, job_id)
+        result = await _restore_job_logic(manager, job_id)
+        log_job_event(
+            actor=user_id or "system",
+            action="job_restored",
+            job_id=job_id,
+            outcome="success",
+        )
+        return result
 
     @router.delete("/api/recycle_bin/{job_id}", response_model=dict)
     async def hard_delete_job(
@@ -959,7 +1009,14 @@ def register_jobs_write_routes(
                 }
             )
             _extraction_templates_store[store_key] = template
-            return _template_public_view(template)
+        log_job_event(
+            actor=user_id or "system",
+            action="template_created",
+            job_id=body.id,
+            outcome="success",
+            details={"name": template.get("name", "")},
+        )
+        return _template_public_view(template)
 
     @router.get("/api/templates", response_model=list[dict])
     async def list_templates(
@@ -1027,7 +1084,13 @@ def register_jobs_write_routes(
                     tpl[key] = value
             tpl["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
             _extraction_templates_store[store_key] = tpl
-            return _template_public_view(tpl)
+        log_job_event(
+            actor=user_id or "system",
+            action="template_updated",
+            job_id=template_id,
+            outcome="success",
+        )
+        return _template_public_view(tpl)
 
     @router.delete("/api/templates/{template_id}", status_code=204)
     async def delete_template(
@@ -1053,6 +1116,12 @@ def register_jobs_write_routes(
                 raise HTTPException(status_code=404, detail="Template not found")
             store_key, _tpl = found
             del _extraction_templates_store[store_key]
+        log_job_event(
+            actor=user_id or "system",
+            action="template_deleted",
+            job_id=template_id,
+            outcome="success",
+        )
 
     # ═══════════════════════════════════════════════════════════════════════
     # Batch URL Submission (Feat 13)
@@ -1383,8 +1452,16 @@ def register_jobs_write_routes(
                 webhook_url=body.webhook_url,
                 events=body.events or ["completed"],
             )
-            _notification_channels_store[job_id].append(channel.model_dump())
-            return _notification_channels_store[job_id][-1]
+            channel_data = channel.model_dump()
+            _notification_channels_store[job_id].append(channel_data)
+        log_job_event(
+            actor=user_id or "system",
+            action="notification_channel_created",
+            job_id=job_id,
+            outcome="success",
+            details={"channel_id": channel_data.get("id", ""), "type": body.type},
+        )
+        return channel_data
 
     @router.patch("/api/jobs/{job_id}/notification-channels/{channel_id}", response_model=dict)
     async def update_notification_channel(
@@ -1410,6 +1487,7 @@ def register_jobs_write_routes(
         # an invalidated index).
         with _notification_channels_lock:
             channels = _notification_channels_store.get(job_id, [])
+            found_ch = None
             for ch in channels:
                 if ch.get("id") == channel_id:
                     patch_data = body.model_dump(exclude_unset=True)
@@ -1417,8 +1495,18 @@ def register_jobs_write_routes(
                         if value is not None:
                             ch[key] = value
                     ch["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
-                    return ch
-        raise HTTPException(status_code=404, detail="Notification channel not found")
+                    found_ch = ch
+                    break
+        if found_ch is None:
+            raise HTTPException(status_code=404, detail="Notification channel not found")
+        log_job_event(
+            actor=user_id or "system",
+            action="notification_channel_updated",
+            job_id=job_id,
+            outcome="success",
+            details={"channel_id": channel_id, "type": found_ch.get("type", "")},
+        )
+        return found_ch
 
     @router.delete("/api/jobs/{job_id}/notification-channels/{channel_id}", status_code=204)
     async def delete_notification_channel(
@@ -1442,11 +1530,21 @@ def register_jobs_write_routes(
         # dropping the wrong channel or raising IndexError -> 500.
         with _notification_channels_lock:
             channels = _notification_channels_store.get(job_id, [])
+            deleted = False
             for i, ch in enumerate(channels):
                 if ch.get("id") == channel_id:
                     _notification_channels_store[job_id].pop(i)
-                    return
-        raise HTTPException(status_code=404, detail="Notification channel not found")
+                    deleted = True
+                    break
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Notification channel not found")
+        log_job_event(
+            actor=user_id or "system",
+            action="notification_channel_deleted",
+            job_id=job_id,
+            outcome="success",
+            details={"channel_id": channel_id},
+        )
 
     # ---- Review Queue (Qual 9, Qual 15) ----
 
@@ -1593,6 +1691,17 @@ def register_jobs_write_routes(
             raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'")
         if not ok:
             raise HTTPException(status_code=404, detail="Review not found or not pending")
+        log_job_event(
+            actor=user_id or "system",
+            action="review_updated",
+            job_id=review_job_id,
+            outcome="success",
+            details={
+                "review_id": review_id,
+                "action": action,
+                "reviewer": user_id,
+            },
+        )
         return _get_review(review_id)
 
     @router.patch("/api/jobs/{job_id}/results/{record_id}", response_model=dict)
@@ -1624,6 +1733,17 @@ def register_jobs_write_routes(
         result = correct_record_field(job_id, record_id, field_name, corrected_value, reviewer=user_id)
         if result is None:
             raise HTTPException(status_code=500, detail="Failed to create correction")
+        log_job_event(
+            actor=user_id or "system",
+            action="record_corrected",
+            job_id=job_id,
+            outcome="success",
+            details={
+                "record_id": record_id,
+                "field_name": field_name,
+                "reviewer": user_id,
+            },
+        )
         return result
 
     # ---- Sitemap Discovery (Comp 3) ----
