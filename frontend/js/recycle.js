@@ -73,7 +73,7 @@ function _render() {
         <tr data-job-id="${attrStr(j.id)}">
           <td class="col-recycle-id" data-label="Job ID">${esc((j.id || "").slice(0, 12))}</td>
           <td class="col-recycle-deleted" data-label="Deleted At">${esc(_formatTimestamp(j.deleted_at || j.updated_at))}</td>
-          <td class="col-recycle-url" data-label="Target URL" title="${esc(targetUrl)}">${esc(targetUrl)}</td>
+          <td class="col-recycle-url" data-label="Target URL" title="${attrStr(targetUrl)}">${esc(targetUrl)}</td>
           <td class="col-recycle-status" data-label="Status"><span class="${statusBadgeClass}">${esc(statusLabel)}</span></td>
           <td class="col-recycle-actions" data-label="Actions">
             <div class="hover-actions">

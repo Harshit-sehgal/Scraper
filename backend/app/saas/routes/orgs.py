@@ -15,6 +15,7 @@ from app.saas.models import (
     MembershipRole,
     Organization,
 )
+from app.utils.log_redaction import redact_pii
 from app.utils.rbac import UserRole, require_principal, require_role_with_user
 
 from ._common import (
@@ -577,12 +578,29 @@ async def respond_to_invitation(
         )
 
     status = "accepted" if body.accept else "declined"
+    # FU-2026-07-05 (LOW audit completeness): include the invited email,
+    # the role that would be granted (declined may still be useful — the
+    # inviter may want to chase up), the inviter, and (on accept) the
+    # resulting membership_id. Without these, auditors can only see
+    # ``invitation_id`` + ``org_id`` and must re-query the DB to trace
+    # which email accepted and what role was realized. Email is redacted
+    # to avoid PII-in-aggregators.
+    audit_details: dict[str, str] = {
+        "invitation_id": invitation_id,
+        "org_id": result["org_id"],
+        "invited_email": redact_pii(result["invited_email"]),
+        "invited_by_user_id": str(result["invited_by_user_id"]),
+        "role": str(result["role"]),
+    }
+    membership_id = result.get("membership_id")
+    if isinstance(membership_id, str) and membership_id:
+        audit_details["membership_id"] = membership_id
     log_job_event(
         actor=user_id,
         action=f"invitation_{status}",
         job_id="saas",
         outcome="success",
-        details={"invitation_id": invitation_id, "org_id": result["org_id"]},
+        details=audit_details,
     )
 
     return InvitationRespondResponse(

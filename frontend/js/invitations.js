@@ -2,7 +2,7 @@
    DataForge — Team Invitations View
    ═══════════════════════════════════════════ */
 
-import { esc, toast } from "./utils.js";
+import { attrStr, esc, toast } from "./utils.js";
 import { apiFetch } from "./api.js";
 
 export async function refreshInvitations() {
@@ -44,10 +44,10 @@ async function refreshPendingInvitations() {
             <span class="hint">Expires: ${esc(new Date(inv.expires_at).toLocaleDateString())}</span>
           </div>
           <div class="invitation-actions">
-            <button type="button" class="btn primary small" data-action="accept-invitation" data-id="${esc(inv.id)}">
+            <button type="button" class="btn primary small" data-action="accept-invitation" data-id="${attrStr(inv.id)}">
               Accept
             </button>
-            <button type="button" class="btn ghost small" data-action="decline-invitation" data-id="${esc(inv.id)}">
+            <button type="button" class="btn ghost small" data-action="decline-invitation" data-id="${attrStr(inv.id)}">
               Decline
             </button>
           </div>
@@ -91,7 +91,7 @@ async function loadOrgSelects() {
     const data = await res.json();
     const orgs = Array.isArray(data.items) ? data.items : [];
 
-    const options = orgs.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`);
+    const options = orgs.map((o) => `<option value="${attrStr(o.id)}">${esc(o.name)}</option>`);
 
     if (createSelect) {
       createSelect.innerHTML = `<option value="">Select an org…</option>${options.join("")}`;
@@ -181,7 +181,7 @@ async function refreshOrgInvitations() {
           <div class="invitation-info">
             <strong>${esc(inv.org_name)}</strong>
             <span>→ ${esc(inv.invited_email)}</span>
-            <span class="badge ${esc(inv.status)}">${esc(inv.status)}</span>
+            <span class="badge ${attrStr(inv.status)}">${esc(inv.status)}</span>
             <span class="hint">Role: ${esc(inv.role)}</span>
           </div>
           <div class="invitation-meta">

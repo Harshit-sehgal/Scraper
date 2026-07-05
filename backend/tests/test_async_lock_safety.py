@@ -70,12 +70,15 @@ def test_no_sync_lock_held_across_await() -> None:
 
 
 def test_restore_job_await_outside_lock() -> None:
-    """The ``_restore_job_logic`` function must have separate lock blocks for the
-    pre-await check and the post-await update.
+    """The ``_restore_job_logic`` function must do the repository IO
+    (``await run_in_threadpool``) BEFORE entering ``with manager.lock``
+    so the sync lock is never held across an await.
+
+    Original B1 P0 bug: the await was inside the lock. The correct
+    pattern is exactly ONE lock block AFTER the await — not two.
     """
     source = JOBS_WRITE.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    # The actual lock logic is in _restore_job_logic, not the thin wrapper restore_job
     for node in ast.walk(tree):
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "_restore_job_logic":
             await_nodes = [n for n in ast.walk(node) if isinstance(n, ast.Await)]
@@ -85,11 +88,19 @@ def test_restore_job_await_outside_lock() -> None:
                 if isinstance(n, ast.With) and any(_LockAwaitVisitor._is_manager_lock(item.context_expr) for item in n.items)
             ]
             assert await_nodes, "_restore_job_logic has no await"
-            assert len(lock_with_nodes) >= 2, "need at least 2 lock blocks"
-            first_lock_end = lock_with_nodes[0].end_lineno or lock_with_nodes[0].lineno + 1
+            # The correct pattern is ONE lock block (the post-await
+            # store update). The original bug had the await inside
+            # the lock, which would give ≥2 blocks when the
+            # fixed-in-place code split them.
+            assert len(lock_with_nodes) == 1, (
+                f"_restore_job_logic should have exactly 1 lock block (post-await store update), got {len(lock_with_nodes)}"
+            )
+            # The lock block must come AFTER the await, not contain it.
+            lock_start = lock_with_nodes[0].lineno
             first_await_line = min(n.lineno for n in await_nodes)
-            assert first_lock_end < first_await_line, (
-                f"first lock block ends at line {first_lock_end}, but await at line {first_await_line} is inside it"
+            assert first_await_line < lock_start, (
+                f"await at line {first_await_line} must be BEFORE lock at line {lock_start};"
+                f" sync lock held across await = B1 P0 regression"
             )
             return
     pytest.fail("Could not find _restore_job_logic function")

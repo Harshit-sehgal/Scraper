@@ -30,6 +30,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.audit_logger import log_job_event
 from app.billing.models import PlanTierId, SubscriptionStatus
 from app.billing.service import _redact_id, resolve_tier_from_plan_id
 from app.config import settings
@@ -581,6 +582,24 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
             normalized_plan,
             status,
         )
+        # FU-2026-07-05 (MED audit completeness): every subscription
+        # state change triggered by a webhook must land in the structured
+        # audit sink so SOC review can correlate payment-provider events
+        # against tier transitions. ``actor`` is the webhook source so
+        # the resulting event_type=admin row is distinguishable from a
+        # human-admin tier change.
+        log_job_event(
+            actor=f"webhook:{event_type}",
+            action="billing_subscription_state_change",
+            job_id=f"customer:{_redact_id(customer_id)}",
+            outcome="success",
+            details={
+                "event_type": event_type,
+                "new_tier": normalized_plan,
+                "new_status": status,
+                "subscription_id": sub_id,
+            },
+        )
 
     # -- Subscription suspended (preserve existing tier, mark past_due) ------
     elif event_type in _PAYPAL_SUSPENDED_EVENTS:
@@ -603,6 +622,17 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
                 customer_id,
                 result.get("plan_tier", PlanTierId.FREE.value),
             )
+            log_job_event(
+                actor=f"webhook:{event_type}",
+                action="billing_subscription_suspended",
+                job_id=f"customer:{_redact_id(customer_id)}",
+                outcome="success",
+                details={
+                    "event_type": event_type,
+                    "preserved_tier": result.get("plan_tier", PlanTierId.FREE.value),
+                    "new_status": SubscriptionStatus.PAST_DUE.value,
+                },
+            )
         else:
             logger.warning("SUSPENDED event for unknown customer=%s — no existing record to preserve", _redact_id(customer_id))
 
@@ -622,6 +652,17 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
             status="canceled",
         )
         logger.info("Subscription %s: customer=%s downgraded to free", event_type, _redact_id(customer_id))
+        log_job_event(
+            actor=f"webhook:{event_type}",
+            action="billing_subscription_cancelled",
+            job_id=f"customer:{_redact_id(customer_id)}",
+            outcome="success",
+            details={
+                "event_type": event_type,
+                "new_tier": PlanTierId.FREE.value,
+                "new_status": "canceled",
+            },
+        )
 
     # -- Payment failed (subscription-level or sale-level) -------------------
     elif event_type == "invoice.payment_failed" or event_type in _PAYPAL_PAYMENT_FAILED_EVENTS:
@@ -639,6 +680,17 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
         result = update_customer_subscription(customer_id, _payment_failed)
         if result:
             logger.warning("Payment failed for customer=%s — status set to past_due", _redact_id(customer_id))
+            log_job_event(
+                actor=f"webhook:{event_type}",
+                action="billing_payment_failed",
+                job_id=f"customer:{_redact_id(customer_id)}",
+                outcome="failure",
+                details={
+                    "event_type": event_type,
+                    "preserved_tier": result.get("plan_tier", PlanTierId.FREE.value),
+                    "new_status": SubscriptionStatus.PAST_DUE.value,
+                },
+            )
         else:
             logger.warning("Payment failed for unknown customer=%s — no existing record", _redact_id(customer_id))
 
@@ -663,6 +715,17 @@ def _process_webhook_event(event_type: str, data: dict[str, Any], customer_id: s
         result = update_customer_subscription(customer_id, _payment_completed)
         if result:
             logger.info("Payment completed for customer=%s — subscription reactivated", _redact_id(customer_id))
+            log_job_event(
+                actor=f"webhook:{event_type}",
+                action="billing_payment_completed",
+                job_id=f"customer:{_redact_id(customer_id)}",
+                outcome="success",
+                details={
+                    "event_type": event_type,
+                    "tier": result.get("plan_tier", PlanTierId.FREE.value),
+                    "new_status": SubscriptionStatus.ACTIVE.value,
+                },
+            )
         else:
             logger.info("Payment completed for unknown customer=%s — no existing record", _redact_id(customer_id))
 

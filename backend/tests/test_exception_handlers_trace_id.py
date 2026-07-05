@@ -109,14 +109,16 @@ class TestFastAPITraceIdExceptionHandlers:
         )
         body = res.json()
         assert "trace_id" in body, "F-EXCEPTION-001: 500 body without trace_id; client cannot link back to the server log."
-        assert "error_class" in body, (
-            "F-EXCEPTION-001: 500 body missing error_class; ops only see a generic 'internal error' string."
-        )
-        assert body["error_class"] == "ValueError", (
-            "F-EXCEPTION-001: error_class is the exception type's name"
-            " so operators can quickly triage (e.g. ValueError = bad"
-            " input, RuntimeError = missing config). Got"
-            f" {body['error_class']!r}."
+        # FU-2026-07-05 F-DISC-007: error_class MUST NOT be exposed to
+        # the client. Leaking ``type(exc).__name__`` reveals which
+        # internal libraries are in play (e.g. selenium = browser
+        # pool active, psycopg2.OperationalError = Postgres driver
+        # mounted). The trace_id alone is sufficient for operators to
+        # look up the real class in the server logs.
+        assert "error_class" not in body, (
+            "F-DISC-007: 500 body leaked error_class; exposing"
+            " exception type names maps the server's internal"
+            " dependency graph to attackers."
         )
         # Error message must NOT leak the full exception text — that
         # would otherwise expose stack frame layout to clients.

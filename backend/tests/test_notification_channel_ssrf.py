@@ -19,6 +19,7 @@ through, the transport would refuse to dial a private IP).
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import patch
 
 import pytest
@@ -123,10 +124,11 @@ class TestNotifierDeliveryUsesSafeTransport:
             # was invoked at all.  Raise mid-flight to short-circuit.
             mock_factory.side_effect = RuntimeError("factory-called")
             notifier = SlackNotifier()
-            import asyncio
-
+            # ``asyncio.run`` constructs a fresh loop, avoiding Python
+            # 3.12's ``get_event_loop`` -> "no current event loop" error
+            # when pytest's session loop has already been closed.
             with pytest.raises(RuntimeError, match="factory-called"):
-                asyncio.get_event_loop().run_until_complete(
+                asyncio.run(
                     asyncio.wait_for(
                         notifier.send("https://hooks.slack.com/x", "s", "b"),
                         timeout=2,
@@ -140,10 +142,8 @@ class TestNotifierDeliveryUsesSafeTransport:
         with patch("app.url_safety.get_safe_async_client") as mock_factory:
             mock_factory.side_effect = RuntimeError("factory-called")
             notifier = TeamsNotifier()
-            import asyncio
-
             with pytest.raises(RuntimeError, match="factory-called"):
-                asyncio.get_event_loop().run_until_complete(
+                asyncio.run(
                     asyncio.wait_for(
                         notifier.send("https://outlook.office.com/webhook/x", "s", "b"),
                         timeout=2,
@@ -157,10 +157,8 @@ class TestNotifierDeliveryUsesSafeTransport:
         with patch("app.url_safety.get_safe_async_client") as mock_factory:
             mock_factory.side_effect = RuntimeError("factory-called")
             notifier = DiscordNotifier()
-            import asyncio
-
             with pytest.raises(RuntimeError, match="factory-called"):
-                asyncio.get_event_loop().run_until_complete(
+                asyncio.run(
                     asyncio.wait_for(
                         notifier.send("https://discord.com/api/webhooks/x/y", "s", "b"),
                         timeout=2,

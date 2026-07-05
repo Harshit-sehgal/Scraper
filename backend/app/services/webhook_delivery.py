@@ -57,6 +57,8 @@ import json
 import logging
 from typing import Any
 
+from app.utils.log_redaction import truncate_url
+
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES: int = 3
@@ -251,10 +253,15 @@ async def deliver_webhook(
     # cannot mask a current failure.
     job.webhook_delivered = False
     job.webhook_delivered_at = None
+    # FU-2026-07-05 (LOW log disclosure): Slack/Teams/Discord
+    # incoming-webhook URLs embed the secret in the path.
+    # Logging the full URL persists it into aggregators/SIEM
+    # and long-lived backup archives. Truncate to first 60 chars
+    # (host + enough path prefix for routing, no secret suffix).
     logger.error(
         "Webhook delivery exhausted retries for job %s → %s",
         getattr(job, "id", ""),
-        webhook_url,
+        truncate_url(webhook_url),
     )
     return False
 

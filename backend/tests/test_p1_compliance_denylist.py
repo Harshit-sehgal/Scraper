@@ -351,7 +351,14 @@ async def test_admin_add_empty_domain_rejected_at_pydantic(denylist_client) -> N
 @pytest.mark.asyncio
 async def test_admin_add_path_prefix_without_slash_returns_400(denylist_client) -> None:
     """A path_prefix that does not start with '/' trips the ValueError
-    in DomainDenylist.add → 400 (the third validation branch)."""
+    in DomainDenylist.add → 400 (the third validation branch).
+
+    FU-2026-07-05: this assertion used to peer at the leaked
+    ``str(exc)`` for validation internals; the operator router now
+    returns a generic message so we only verify status. The full
+    reason is still written to the server-side warning log (verified
+    by the capture-log check below).
+    """
     client, _instance = denylist_client
     resp = await client.post(
         "/api/operator/denylist",
@@ -359,7 +366,6 @@ async def test_admin_add_path_prefix_without_slash_returns_400(denylist_client) 
         headers={"X-API-Key": "admin-token"},
     )
     assert resp.status_code == 400
-    assert "path_prefix" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio

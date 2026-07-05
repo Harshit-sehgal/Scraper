@@ -151,12 +151,21 @@ _binary_store_lock = threading.Lock()
 
 
 def _sanitize_filename(filename: str) -> str:
-    """Strip path separators from *filename* to prevent path traversal.
+    """Strip path separators and CRLF from *filename* to prevent path
+    traversal and Content-Disposition header injection.
 
-    Returns only the basename component after stripping slashes and
-    raising if the cleaned name is empty or contains ``..`` segments.
+    Returns only the basename component after stripping slashes,
+    control characters, and raising if the cleaned name is empty or
+    contains ``..`` segments.
     """
-    safe = Path(filename).name  # strips any directory components
+    # FU-2026-07-05 (LOW defense-in-depth): strip CR (\r) and LF (\n)
+    # before extracting the basename. ``Path(...).name`` strips / and
+    # \ but does not remove newlines; a filename containing \r\n could
+    # be interpolated into a ``Content-Disposition: attachment;
+    # filename="…"`` header and inject additional HTTP headers or a
+    # second body part.
+    sanitised = "".join(ch for ch in filename if ch not in "\r\n")
+    safe = Path(sanitised).name  # strips any directory components
     if not safe or safe == "." or ".." in Path(safe).parts:
         msg = f"Invalid filename: {filename!r}"
         raise ValueError(msg)

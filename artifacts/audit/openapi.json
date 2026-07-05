@@ -970,6 +970,7 @@
         "type": "object"
       },
       "FetchStrategyUpdate": {
+        "additionalProperties": false,
         "description": "Request body to update a job's fetch strategy (Literal-strained variant).\n\nAccepts the same values as ``JobStrategyUpdate`` but uses a\n``Literal`` type so OpenAPI documentation and client code generators\ncan enumerate the valid strategies without inspecting the\n``strategy_evolution`` module at runtime.",
         "properties": {
           "strategy": {
@@ -1284,6 +1285,7 @@
         "type": "object"
       },
       "JobCreate": {
+        "additionalProperties": false,
         "description": "Request body to create a new scraping job.",
         "properties": {
           "auth_profile_id": {
@@ -1641,7 +1643,7 @@
         "type": "object"
       },
       "JobExtractionUpdate": {
-        "description": "Request body to update per-job extraction behaviour flags.\n\nAll fields are optional; absent or ``null`` fields leave the existing value intact\n(or restore the platform default when the field is ``null``).  This lets callers\nPATCH a single knob without having to re-send the entire job config.",
+        "description": "Request body to update per-job extraction behaviour flags.\n\nAll fields are optional; absent or ``null`` fields leave the existing value intact\n(or restore the platform default when the field is ``null``).  This lets callers\n\nmodel_config = ConfigDict(extra=\"forbid\")\nPATCH a single knob without having to re-send the entire job config.",
         "properties": {
           "hydration_wait_ms": {
             "anyOf": [
@@ -1802,6 +1804,7 @@
         "type": "object"
       },
       "JobHeadersUpdate": {
+        "additionalProperties": false,
         "description": "Request body to update job headers and cookies.",
         "properties": {
           "cookies": {
@@ -1876,6 +1879,7 @@
         "type": "object"
       },
       "JobStrategyUpdate": {
+        "additionalProperties": false,
         "description": "Request body to update a job's fetch strategy.",
         "properties": {
           "fetch_strategy": {
@@ -1892,6 +1896,7 @@
         "type": "object"
       },
       "JobUserAgentUpdate": {
+        "additionalProperties": false,
         "description": "Request body to update a job's custom User-Agent string.",
         "properties": {
           "user_agent": {
@@ -1906,6 +1911,7 @@
         "type": "object"
       },
       "JobWaitConditionsUpdate": {
+        "additionalProperties": false,
         "description": "Request body to update per-job JS wait condition configuration.\n\nAll fields are optional; absent fields leave existing values unchanged.\nSet a field to ``null`` to clear it (restore platform default behaviour).",
         "properties": {
           "wait_for_function": {
@@ -1965,6 +1971,7 @@
         "type": "object"
       },
       "JobWebhookUpdate": {
+        "additionalProperties": false,
         "description": "Request body to update job webhook configuration.",
         "properties": {
           "webhook_secret": {
@@ -7057,7 +7064,7 @@
     },
     "/api/reviews": {
       "get": {
-        "description": "List pending review items from the manual review queue.",
+        "description": "List pending review items from the manual review queue.\n\nFU-2026-07-05: returns only review items whose associated job_id\nbelongs to the caller's visible tenant scope. Previously this returned\nALL pending reviews globally. Env-backed admin keys (no org_id) retain\nall-access via the ADMIN shortcut in can_access_scoped_resource.",
         "operationId": "list_reviews_api_reviews_get",
         "parameters": [
           {
@@ -7116,7 +7123,7 @@
     },
     "/api/reviews/{review_id}": {
       "get": {
-        "description": "Get a single review item by ID.",
+        "description": "Get a single review item by ID.\n\nFU-2026-07-05: returns 404 unless the review's associated job belongs\nto the caller's visible tenant scope. Env-backed admin sees all\nreviews.",
         "operationId": "get_review_api_reviews__review_id__get",
         "parameters": [
           {
@@ -7159,7 +7166,7 @@
         ]
       },
       "patch": {
-        "description": "Approve or reject a review item (Qual 9).",
+        "description": "Approve or reject a review item (Qual 9).\n\nFU-2026-07-05: tenant-scoped \u2014 caller must have write access to\nthe review's associated job. Env-backed admin keys (no org_id)\nretain all-access; in that case the job-not-found check still\napplies (no job in store = 404) since the admin shouldn't blind-\napprove arbitrary review-IDs.",
         "operationId": "update_review_api_reviews__review_id__patch",
         "parameters": [
           {

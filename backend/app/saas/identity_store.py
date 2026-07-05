@@ -1078,11 +1078,21 @@ class SQLiteIdentityStore(IdentityStore):
                             "INSERT INTO memberships (id, user_id, org_id, role, created_at) VALUES (?, ?, ?, ?, ?)",
                             (membership_id, user_row["id"], row["org_id"], role, now),
                         )
+            else:
+                membership_id = None
             conn.commit()
+        # FU-2026-07-05 (LOW audit trail): include role + inviter + (on
+        # accept) the newly-created membership_id so the route layer can
+        # log full context (email/role/inviter/membership_id) rather than
+        # just invitation_id + org_id. Auditors need this to reconcile an
+        # ``invitation_accepted`` event with the resulting membership row.
         return {
             "id": invitation_id,
             "org_id": row["org_id"],
             "invited_email": row["invited_email"],
+            "invited_by_user_id": row["invited_by_user_id"],
+            "role": row["role"],
+            "membership_id": membership_id,
             "status": new_status,
             "responded_at": now,
         }

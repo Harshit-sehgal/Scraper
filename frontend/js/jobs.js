@@ -455,7 +455,7 @@ export function renderJobs(jobs) {
                 <td class="col-job-id" data-label="Job ID">${esc((j.id || "").slice(0, 8))}</td>
                 <td class="col-job-name" data-label="Job">
                     <div class="col-job-name-row">
-                        <span title="${esc(j.name)}">${esc(j.name)}</span>
+                        <span title="${attrStr(j.name)}">${esc(j.name)}</span>
                         <button class="btn-copy-id" data-action="copy-job-id" data-id="${attrStr(j.id)}" title="Copy job ID" aria-label="Copy job ID"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
                         <span class="mode-tag">${j.mode === "auto" ? "auto" : "manual"}</span>
                     </div>

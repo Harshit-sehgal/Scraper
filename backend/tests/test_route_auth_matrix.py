@@ -78,7 +78,7 @@ ROUTE_MATRIX = [
     ("DELETE", "/api/scraper/telemetry", "admin"),
     ("POST", "/api/operator/mode", "admin"),
     ("GET", "/api/operator/mode", "admin"),
-    ("DELETE", "/api/recycle_bin", "admin"),
+    ("DELETE", "/api/recycle_bin", "operator-or-admin"),
     ("POST", "/api/system/scheduler/step", "admin"),
     ("POST", "/api/system/refactor/compress", "admin"),
     ("POST", "/api/scraper/selectors/cleanup", "admin"),
@@ -127,6 +127,7 @@ def expected_status(method: str, path: str, auth_level: str, min_role: str) -> i
       - Operator auth + user route -> 200
       - Operator auth + operator route -> 200
       - Operator auth + admin route -> 403
+      - Operator auth + operator-or-admin route -> 200
       - Admin auth + any route -> 200
     """
     if min_role == "public":
@@ -139,9 +140,11 @@ def expected_status(method: str, path: str, auth_level: str, min_role: str) -> i
         return 200
     if auth_level == "user" and min_role in ("operator", "admin"):
         return 403
+    if auth_level == "user" and min_role == "operator-or-admin":
+        return 403
     if auth_level == "operator" and min_role == "admin":
         return 403
-    if auth_level == "operator" and min_role in ("user", "operator"):
+    if auth_level == "operator" and min_role in ("user", "operator", "operator-or-admin"):
         return 200
     if auth_level == "admin":
         return 200

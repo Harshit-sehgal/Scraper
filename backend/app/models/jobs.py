@@ -7,7 +7,7 @@ import uuid
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.scraping import (
     FilterRule,
@@ -40,6 +40,7 @@ class LogEntry(BaseModel):
 class JobCreate(BaseModel):
     """Request body to create a new scraping job."""
 
+    model_config = ConfigDict(extra="forbid")
     name: str = Field(..., max_length=255, description="Human-readable job name")
     mode: ScrapeMode = Field(ScrapeMode.MANUAL, description="Manual or Auto discovery mode")
     intent: str = Field("", max_length=4096, description="Natural language extraction intent")
@@ -385,6 +386,7 @@ class Job(BaseModel):
 class JobHeadersUpdate(BaseModel):
     """Request body to update job headers and cookies."""
 
+    model_config = ConfigDict(extra="forbid")
     headers: dict[str, str] = Field(default_factory=dict, description="Custom HTTP headers to send with requests")
     cookies: dict[str, str] = Field(default_factory=dict, description="Custom cookies to inject into requests/browser contexts")
 
@@ -418,6 +420,8 @@ class JobHeadersUpdate(BaseModel):
 
 class JobWebhookUpdate(BaseModel):
     """Request body to update job webhook configuration."""
+
+    model_config = ConfigDict(extra="forbid")
 
     webhook_url: str | None = Field(
         default=None,
@@ -456,6 +460,7 @@ class JobWaitConditionsUpdate(BaseModel):
     Set a field to ``null`` to clear it (restore platform default behaviour).
     """
 
+    model_config = ConfigDict(extra="forbid")
     wait_for_selector: str | None = Field(
         default=None,
         description="CSS selector to wait for before extraction. None = no custom selector wait.",
@@ -486,6 +491,7 @@ class JobWaitConditionsUpdate(BaseModel):
 class JobStrategyUpdate(BaseModel):
     """Request body to update a job's fetch strategy."""
 
+    model_config = ConfigDict(extra="forbid")
     fetch_strategy: str = Field(
         ...,
         description="Fetch strategy to use (playwright_full, httpx_smart, hybrid, etc.). Empty string resets to auto-select.",
@@ -512,6 +518,7 @@ class FetchStrategyUpdate(BaseModel):
     ``strategy_evolution`` module at runtime.
     """
 
+    model_config = ConfigDict(extra="forbid")
     strategy: Literal[
         "playwright_full",
         "playwright_lightweight",
@@ -535,6 +542,8 @@ class JobExtractionUpdate(BaseModel):
 
     All fields are optional; absent or ``null`` fields leave the existing value intact
     (or restore the platform default when the field is ``null``).  This lets callers
+
+    model_config = ConfigDict(extra="forbid")
     PATCH a single knob without having to re-send the entire job config.
     """
 
@@ -613,6 +622,7 @@ class JobExtractionUpdate(BaseModel):
 class JobUserAgentUpdate(BaseModel):
     """Request body to update a job's custom User-Agent string."""
 
+    model_config = ConfigDict(extra="forbid")
     user_agent: str = Field(
         default="",
         description="Custom User-Agent string. Empty string resets to platform default.",

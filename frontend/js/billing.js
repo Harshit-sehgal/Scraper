@@ -5,6 +5,37 @@
 import { apiFetch } from "./api.js";
 import { toast } from "./utils.js";
 
+// FU-2026-07-05 (LOW open-redirect hardening): only HTTPS URLs on
+// known PayPal hosts (or the documented dev sandbox.example.com) are
+// safe to redirect to. Rejecting anything else closes the gap where a
+// spoofed/MITM'd backend response could land the operator on a
+// javascript:/data:/foreign-https URL.
+const APPROVAL_URL_ALLOWED_HOSTS = new Set([
+  "www.paypal.com",
+  "paypal.com",
+  "www.sandbox.paypal.com",
+  "sandbox.paypal.com",
+  "sandbox.example.com",
+  "example.com",
+]);
+
+/**
+ * Validate a server-returned PayPal approval URL before redirecting.
+ * Returns the URL when safe, else null.
+ */
+function safeApprovalUrl(rawUrl) {
+  if (typeof rawUrl !== "string" || !rawUrl) return null;
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:") return null;
+  if (!APPROVAL_URL_ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return null;
+  return rawUrl;
+}
+
 const TIER_LABELS = {
   free: "Free",
   pro: "Pro",
@@ -281,7 +312,12 @@ async function upgradeToTier(targetTier) {
     return;
   }
 
-  window.location.href = approvalUrl;
+  const safeUrl = safeApprovalUrl(approvalUrl);
+  if (!safeUrl) {
+    toast("Checkout returned an unsafe redirect URL. Contact support.", "error");
+    return;
+  }
+  window.location.href = safeUrl;
 }
 
 export async function refreshBilling() {
@@ -371,8 +407,13 @@ export async function upgradePlan() {
     return;
   }
 
-  // PayPal sandbox/stub URLs are sandbox.example.com / example.com — let the
-  // stub flow redirect the operator via window.location so the dev experience
-  // mirrors production.
-  window.location.href = approvalUrl;
+  // FU-2026-07-05: validate before redirecting. PayPal sandbox/stub
+  // URLs are sandbox.example.com / example.com — both are in the
+  // allowlist so the dev stub flow still redirects the operator.
+  const safeUrl = safeApprovalUrl(approvalUrl);
+  if (!safeUrl) {
+    toast("Checkout returned an unsafe redirect URL. Contact support.", "error");
+    return;
+  }
+  window.location.href = safeUrl;
 }

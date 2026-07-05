@@ -407,6 +407,7 @@ class UsageLedger:
         org_id: str = "",
         project_id: str = "",
         api_key_id: str = "",
+        actor: str = "system",
     ) -> Quota:
         """Set quota for a user/tenant."""
         if limit < 0:
@@ -423,6 +424,7 @@ class UsageLedger:
                 api_key_id=api_key_id,
             )
             key = self._quota_key(user_id, usage_type, org_id=org_id, project_id=project_id)
+            preexisting = self._quotas.get(key)
             self._quotas[key] = quota
             if self._storage_path is not None:
                 try:
@@ -430,6 +432,42 @@ class UsageLedger:
                         self._persist_quota(conn, quota)
                 except (sqlite3.Error, OSError):
                     logger.exception("[UsageLedger] Failed to persist quota")
+            # FU-2026-07-05 (LOW audit completeness): quota changes are
+            # administrative mutations; without an audit record a SOC
+            # investigation cannot answer "who raised the per-tenant
+            # limit and when."  We intentionally skip the audit event
+            # for the *first* call that creates a quota key (e.g. bucket
+            # sync via plan_enforcer on startup) so a GET /api/jobs that
+            # incidentally initializes a quota does not contaminate
+            # audit logs with per-request noise.  Limit *changes* (or
+            # explicit re-sets with a non-default actor) still emit.
+            old_limit = getattr(preexisting, "limit", None)
+            if preexisting is not None and old_limit != limit:
+                try:
+                    from app.audit_logger import log_admin_action
+
+                    log_admin_action(
+                        actor=actor,
+                        action="quota_set",
+                        resource=f"user:{user_id}/usage_type:{usage_type.value}",
+                        details={
+                            "limit": limit,
+                            "old_limit": old_limit,
+                            "period": period.value,
+                            "org_id": org_id,
+                            "project_id": project_id,
+                            "api_key_id": api_key_id,
+                        },
+                    )
+                except (ImportError, OSError, RuntimeError, ValueError, TypeError) as exc:
+                    # Audit-logger failures must never break the quota
+                    # write path; the quota is already mutated. The
+                    # exception is observable in the structured logs.
+                    # Narrow: only catch what log_admin_action can raise
+                    # (logging handlers, JSON serialization, persistent
+                    # backend). Anything else (e.g. AttributeError from a
+                    # refactor) should propagate.
+                    logger.warning("[UsageLedger] quota_set audit emit failed: %s", exc)
             return quota
 
     def get_quota(
@@ -445,7 +483,7 @@ class UsageLedger:
             key = self._quota_key(user_id, usage_type, org_id=org_id, project_id=project_id)
             return self._quotas.get(key)
 
-    def reset_quotas(self, user_id: str | None = None) -> int:
+    def reset_quotas(self, user_id: str | None = None, *, actor: str = "system") -> int:
         """Reset quotas for a user or all users."""
         with self._lock:
             reset_count = 0
@@ -462,6 +500,20 @@ class UsageLedger:
                             self._persist_quota(conn, quota)
                 except (sqlite3.Error, OSError):
                     logger.exception("[UsageLedger] Failed to persist quota reset")
+            # FU-2026-07-05 (LOW audit completeness): counters were
+            # wiped — that's an administrative mutation; record who
+            # did it. ``actor`` keyword-only defaults to ``"system"``.
+            try:
+                from app.audit_logger import log_admin_action
+
+                log_admin_action(
+                    actor=actor,
+                    action="quota_reset",
+                    resource=f"user:{user_id or '*'}",
+                    details={"reset_count": reset_count, "scope": user_id or "all"},
+                )
+            except (ImportError, OSError, RuntimeError, ValueError, TypeError) as exc:
+                logger.warning("[UsageLedger] quota_reset audit emit failed: %s", exc)
             return reset_count
 
 

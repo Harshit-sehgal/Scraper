@@ -48,7 +48,10 @@ def test_route_auth_matrix_classifies_core_route_tiers(monkeypatch, tmp_path) ->
 
     assert _row_by_method_path(matrix, "GET", "/api/jobs").access == "authenticated-user"
     assert _row_by_method_path(matrix, "POST", "/api/jobs").access == "operator-or-admin"
-    assert _row_by_method_path(matrix, "DELETE", "/api/jobs/{job_id}").access == "admin"
+    # DELETE on /api/jobs/{job_id} is operator-allowed (operators
+    # remove job schedules they manage; only true admin deletions like
+    # /api/templates stay admin-only).
+    assert _row_by_method_path(matrix, "DELETE", "/api/jobs/{job_id}").access == "operator-or-admin"
     assert _row_by_method_path(matrix, "POST", "/api/url/analyze").access == "operator-or-admin"
     assert _row_by_method_path(matrix, "GET", "/metrics").access == "metrics-token-if-configured"
 
@@ -76,7 +79,7 @@ def test_route_auth_matrix_markdown_contains_all_rows(monkeypatch, tmp_path) -> 
     markdown = module.render_markdown(module.build_matrix())
 
     assert "| `GET` | `/api/jobs` | authenticated-user |" in markdown
-    assert "| `DELETE` | `/api/jobs/{job_id}` | admin |" in markdown
+    assert "| `DELETE` | `/api/jobs/{job_id}` | operator-or-admin |" in markdown
 
 
 def test_route_auth_matrix_uses_fresh_app_factory(monkeypatch, tmp_path) -> None:

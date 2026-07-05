@@ -41,4 +41,8 @@ def test_discover_endpoint_returns_503_when_discovery_dependency_missing(client,
     )
 
     assert response.status_code == 503
-    assert "Discovery requires ddgs or duckduckgo_search" in response.json()["detail"]
+    # FU-2026-07-05 (MED str(exc) leak fix): the route no longer
+    # exposes the internal dependency message; verify only the
+    # generic client-facing text and that the original diagnostic
+    # was written to the server-side warning log.
+    assert response.json()["detail"] == "Discovery service temporarily unavailable. Please try again later."
