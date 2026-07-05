@@ -91,6 +91,16 @@ _extraction_templates_store: dict[str, dict[str, Any]] = {}
 _notification_channels_store: dict[str, list[dict[str, Any]]] = {}
 _usage_stats_store: dict[str, dict[str, Any]] = {}
 _usage_stats_lock = threading.Lock()
+# FU-2026-07-06: these in-memory dicts are mutated from concurrent async
+# requests. Without a lock the check-then-act on create / update-template
+# and the create / update / delete-notification-channel paths race
+# (lost updates, dropped appends on list re-init, .pop(i) re-indexing
+# mid-iteration, and a write-after-delete reintroducing a deleted record).
+# The locks are sync ``threading.Lock`` deliberately — every guarded
+# section is pure in-memory dict/list mutation with no ``await``, so the
+# lock is never held across an await (no B1-class async-lock hazard).
+_extraction_templates_lock = threading.Lock()
+_notification_channels_lock = threading.Lock()
 _TEMPLATE_INTERNAL_KEYS = {"created_by", "org_id", "project_id"}
 _USAGE_INTERNAL_KEYS = {"api_key", "created_by", "org_id", "project_id"}
 
@@ -930,21 +940,26 @@ def register_jobs_write_routes(
     ):
         _role, user_id, org_id, project_id = _auth_tuple(auth)
         store_key = _template_store_key(body.id, user_id=user_id, org_id=org_id, project_id=project_id)
-        if store_key in _extraction_templates_store:
-            raise HTTPException(status_code=409, detail="Template already exists")
-        now = datetime.datetime.now(datetime.UTC).isoformat()
-        body.created_at = now
-        body.updated_at = now
-        template = body.model_dump()
-        template.update(
-            {
-                "created_by": user_id,
-                "org_id": org_id,
-                "project_id": project_id,
-            }
-        )
-        _extraction_templates_store[store_key] = template
-        return _template_public_view(template)
+        # FU-2026-07-06: atomic check-then-insert. Without the lock two
+        # concurrent creates with the same ``body.id`` in the same tenant
+        # scope both pass the existence check and the second silently
+        # overwrites the first (no 409 raised).
+        with _extraction_templates_lock:
+            if store_key in _extraction_templates_store:
+                raise HTTPException(status_code=409, detail="Template already exists")
+            now = datetime.datetime.now(datetime.UTC).isoformat()
+            body.created_at = now
+            body.updated_at = now
+            template = body.model_dump()
+            template.update(
+                {
+                    "created_by": user_id,
+                    "org_id": org_id,
+                    "project_id": project_id,
+                }
+            )
+            _extraction_templates_store[store_key] = template
+            return _template_public_view(template)
 
     @router.get("/api/templates", response_model=list[dict])
     async def list_templates(
@@ -991,23 +1006,28 @@ def register_jobs_write_routes(
         ],
     ):
         role, user_id, org_id, project_id = _auth_tuple(auth)
-        found = _find_accessible_template(
-            template_id,
-            role=role,
-            user_id=user_id,
-            org_id=org_id,
-            project_id=project_id,
-        )
-        if found is None:
-            raise HTTPException(status_code=404, detail="Template not found")
-        store_key, tpl = found
-        patch_data = body.model_dump(exclude_unset=True)
-        for key, value in patch_data.items():
-            if value is not None:
-                tpl[key] = value
-        tpl["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
-        _extraction_templates_store[store_key] = tpl
-        return _template_public_view(tpl)
+        # FU-2026-07-06: hold the lock across the read-modify-write so a
+        # concurrent update/delete cannot mutate the shared dict between
+        # the find and the reassign (which would lose one writer's patch
+        # or reintroduce a just-deleted template).
+        with _extraction_templates_lock:
+            found = _find_accessible_template(
+                template_id,
+                role=role,
+                user_id=user_id,
+                org_id=org_id,
+                project_id=project_id,
+            )
+            if found is None:
+                raise HTTPException(status_code=404, detail="Template not found")
+            store_key, tpl = found
+            patch_data = body.model_dump(exclude_unset=True)
+            for key, value in patch_data.items():
+                if value is not None:
+                    tpl[key] = value
+            tpl["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+            _extraction_templates_store[store_key] = tpl
+            return _template_public_view(tpl)
 
     @router.delete("/api/templates/{template_id}", status_code=204)
     async def delete_template(
@@ -1018,17 +1038,21 @@ def register_jobs_write_routes(
         ],
     ):
         role, user_id, org_id, project_id = _auth_tuple(auth)
-        found = _find_accessible_template(
-            template_id,
-            role=role,
-            user_id=user_id,
-            org_id=org_id,
-            project_id=project_id,
-        )
-        if found is None:
-            raise HTTPException(status_code=404, detail="Template not found")
-        store_key, _tpl = found
-        del _extraction_templates_store[store_key]
+        # FU-2026-07-06: lock so the find-then-delete is atomic vs a
+        # concurrent create/update (else the delete can race an update
+        # that reassigns the key after we removed it, reintroducing it).
+        with _extraction_templates_lock:
+            found = _find_accessible_template(
+                template_id,
+                role=role,
+                user_id=user_id,
+                org_id=org_id,
+                project_id=project_id,
+            )
+            if found is None:
+                raise HTTPException(status_code=404, detail="Template not found")
+            store_key, _tpl = found
+            del _extraction_templates_store[store_key]
 
     # ═══════════════════════════════════════════════════════════════════════
     # Batch URL Submission (Feat 13)
@@ -1346,16 +1370,21 @@ def register_jobs_write_routes(
         valid_types = {"slack", "teams", "discord", "email"}
         if body.type not in valid_types:
             raise HTTPException(status_code=422, detail=f"type must be one of {valid_types}")
-        if job_id not in _notification_channels_store:
-            _notification_channels_store[job_id] = []
-        channel = NotificationChannel(
-            job_id=job_id,
-            type=body.type,
-            webhook_url=body.webhook_url,
-            events=body.events or ["completed"],
-        )
-        _notification_channels_store[job_id].append(channel.model_dump())
-        return _notification_channels_store[job_id][-1]
+        # FU-2026-07-06: atomic init-then-append. Without the lock two
+        # concurrent creates for the same job both observe the key
+        # missing, both assign a fresh ``[]``, and the second assignment
+        # drops the channel the first appended on the floor.
+        with _notification_channels_lock:
+            if job_id not in _notification_channels_store:
+                _notification_channels_store[job_id] = []
+            channel = NotificationChannel(
+                job_id=job_id,
+                type=body.type,
+                webhook_url=body.webhook_url,
+                events=body.events or ["completed"],
+            )
+            _notification_channels_store[job_id].append(channel.model_dump())
+            return _notification_channels_store[job_id][-1]
 
     @router.patch("/api/jobs/{job_id}/notification-channels/{channel_id}", response_model=dict)
     async def update_notification_channel(
@@ -1375,15 +1404,20 @@ def register_jobs_write_routes(
             from app.services.job_mutation_service import _ensure_job_write_access
 
             _ensure_job_write_access(job, role, user_id, org_id, project_id, "update_notification_channel")
-        channels = _notification_channels_store.get(job_id, [])
-        for ch in channels:
-            if ch.get("id") == channel_id:
-                patch_data = body.model_dump(exclude_unset=True)
-                for key, value in patch_data.items():
-                    if value is not None:
-                        ch[key] = value
-                ch["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
-                return ch
+        # FU-2026-07-06: hold the store lock across the iterate-and-mutate
+        # so a concurrent update / create / delete on the same job's
+        # list cannot re-index it mid-iteration (lost patch or 500 from
+        # an invalidated index).
+        with _notification_channels_lock:
+            channels = _notification_channels_store.get(job_id, [])
+            for ch in channels:
+                if ch.get("id") == channel_id:
+                    patch_data = body.model_dump(exclude_unset=True)
+                    for key, value in patch_data.items():
+                        if value is not None:
+                            ch[key] = value
+                    ch["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+                    return ch
         raise HTTPException(status_code=404, detail="Notification channel not found")
 
     @router.delete("/api/jobs/{job_id}/notification-channels/{channel_id}", status_code=204)
@@ -1402,11 +1436,16 @@ def register_jobs_write_routes(
             from app.services.job_mutation_service import _ensure_job_write_access
 
             _ensure_job_write_access(manager.jobs_store[job_id], role, user_id, org_id, project_id, "delete_notification_channel")
-        channels = _notification_channels_store.get(job_id, [])
-        for i, ch in enumerate(channels):
-            if ch.get("id") == channel_id:
-                _notification_channels_store[job_id].pop(i)
-                return
+        # FU-2026-07-06: lock the list for the iterate-and-pop. Without
+        # it two concurrent deletes on different channel_ids of the same
+        # job pop by index on a list that is being re-indexed under them,
+        # dropping the wrong channel or raising IndexError -> 500.
+        with _notification_channels_lock:
+            channels = _notification_channels_store.get(job_id, [])
+            for i, ch in enumerate(channels):
+                if ch.get("id") == channel_id:
+                    _notification_channels_store[job_id].pop(i)
+                    return
         raise HTTPException(status_code=404, detail="Notification channel not found")
 
     # ---- Review Queue (Qual 9, Qual 15) ----
