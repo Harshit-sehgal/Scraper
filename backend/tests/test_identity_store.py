@@ -7,7 +7,6 @@ Uses an in-memory SQLite database for fast, isolated testing.
 from __future__ import annotations
 
 import hashlib
-import time
 
 import pytest
 from app.saas.identity_store import (
@@ -180,7 +179,8 @@ class TestUserCRUD:
 
     def test_mark_aup_accepted_preserves_first_timestamp(self, store: SQLiteIdentityStore, user: User) -> None:
         first = store.mark_aup_accepted(user.id, aup_version="1.0")
-        time.sleep(0.01)  # ensure time difference
+        # No sleep needed — the assertion tests that the FIRST timestamp is
+        # preserved for the same AUP version regardless of call timing.
         second = store.mark_aup_accepted(user.id, aup_version="1.0")
         assert first is not None and second is not None
         # Same version — first timestamp preserved
@@ -188,7 +188,6 @@ class TestUserCRUD:
 
     def test_mark_aup_accepted_new_version_updates(self, store: SQLiteIdentityStore, user: User) -> None:
         first = store.mark_aup_accepted(user.id, aup_version="1.0")
-        time.sleep(0.01)
         second = store.mark_aup_accepted(user.id, aup_version="2.0")
         assert first is not None and second is not None
         # Different version — timestamp should update

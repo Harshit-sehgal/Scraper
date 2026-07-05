@@ -71,11 +71,15 @@ class TestScraperDiagnosticReport:
         d = report.to_dict()
         assert d["errors"] == ["Network timeout", "Parse error"]
 
-    def test_to_dict_latency_ms_is_positive(self) -> None:
+    def test_to_dict_latency_ms_is_positive(self, monkeypatch) -> None:
         report = ScraperDiagnosticReport("http://example.com")
+        # Deterministic clock advance instead of time.sleep(0.001). On
+        # fast machines the constructor and to_dict() can run within a
+        # single clock tick (1ms resolution), making latency_ms round to 0.
         import time
 
-        time.sleep(0.001)
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.005)
         d = report.to_dict()
         assert d["latency_ms"] > 0
 
