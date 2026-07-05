@@ -109,13 +109,22 @@ class TestDatabaseSlidingWindowCounterRemaining:
 class TestDatabaseSlidingWindowCounterIsExpired:
     """Verify is_expired() checks recent DB entries."""
 
-    def test_expired_when_no_recent_entries(self) -> None:
+    def test_expired_when_no_recent_entries(self, monkeypatch) -> None:
         """Counter with no entries must report as expired."""
         counter = DatabaseSlidingWindowCounter(10, 0.001, "exp:gone")
         # window is 0.001s — anything recorded is long expired
+        # Use a controllable clock to skip the real 20ms sleep that was
+        # both slow and flaky (under CI load the 0.001s window could be
+        # borderline missed).
+        original_time = time.time
+        post_record_time = [0.0]
+        monkeypatch.setattr(
+            "time.time",
+            lambda: post_record_time[0] or original_time() + 0.02,
+        )
         with patch(_SETTINGS_PATCH, _sqlite_settings()):
             counter.allow()
-            time.sleep(0.02)  # wait for window to expire
+            post_record_time[0] = original_time() + 0.02
             assert counter.is_expired() is True
 
     def test_not_expired_within_window(self) -> None:
@@ -158,13 +167,22 @@ class TestPruneAll:
             result = DatabaseSlidingWindowCounter.prune_all()
         assert isinstance(result, int)
 
-    def test_prune_all_removes_old_entries(self) -> None:
+    def test_prune_all_removes_old_entries(self, monkeypatch) -> None:
         """After pruning, old entries must be gone."""
         key = f"prune:old:{time.time()}"
         counter = DatabaseSlidingWindowCounter(10, 0.001, key)
+        # Skip the real 20ms sleep with a controllable clock — was both slow
+        # and (under CI load) borderline: the 0.001s window plus a 20ms sleep
+        # is the same shape of flakiness as test_db_sliding_window_counter_sqlite.
+        original_time = time.time
+        post_record_time = [original_time()]
+        monkeypatch.setattr(
+            "time.time",
+            lambda: post_record_time[0],
+        )
         with patch(_SETTINGS_PATCH, _sqlite_settings()):
             counter.allow()
-            time.sleep(0.02)  # Wait for entries to age out
+            post_record_time[0] = original_time() + 0.02
             DatabaseSlidingWindowCounter.prune_all(max_age_seconds=0.01)
         # Counter should be expired after pruning
         with patch(_SETTINGS_PATCH, _sqlite_settings()):

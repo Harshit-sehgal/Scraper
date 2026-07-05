@@ -189,10 +189,13 @@ class TestTransactionalPriorityQueue:
 
     # ─── Aging Interval Trigger ─────────────────────────────────────────
 
-    def test_aging_happens_on_pop_after_interval(self) -> None:
+    def test_aging_happens_on_pop_after_interval(self, monkeypatch) -> None:
         queue = TransactionalPriorityQueue(aging_interval=0.1)
         queue.push(PriorityLevel.LOW, "low_tx")
-        time.sleep(0.15)
+        # Deterministic clock advance instead of time.sleep(0.15). The
+        # aging_interval is 0.1s and 50ms past it is tight under CI load.
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.15)
         # pop should trigger aging since interval elapsed
         entry = queue.peek()
         assert entry is not None

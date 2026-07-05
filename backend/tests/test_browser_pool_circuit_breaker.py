@@ -10,7 +10,6 @@ Validates that the browser pool circuit breaker:
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import app.browser_pool as _bp_module
@@ -134,8 +133,14 @@ class TestCircuitBreakerHalfOpenTransition:
 
             assert cb.state == CircuitState.OPEN
 
-            # Wait for recovery timeout
-            await asyncio.sleep(0.05)
+            # Deterministic clock advance instead of awaiting asyncio.sleep(0.05).
+            # The breaker compares (time.time() - _last_failure_time) to
+            # recovery_timeout, so shifting time forward by 0.05 simulates a
+            # 50ms wall-clock wait without actually sleeping (matters under CI).
+            import app.utils.circuit_breaker as _cb_mod
+
+            original = _cb_mod.time.time
+            _cb_mod.time.time = lambda: original() + 0.05
 
             assert cb.state == CircuitState.HALF_OPEN
 
@@ -158,8 +163,14 @@ class TestCircuitBreakerSuccessClosesCircuit:
 
             assert cb.state == CircuitState.OPEN
 
-            # Wait for recovery timeout to transition to HALF_OPEN
-            await asyncio.sleep(0.05)
+            # Deterministic clock advance instead of awaiting asyncio.sleep(0.05).
+            # The breaker compares (time.time() - _last_failure_time) to
+            # recovery_timeout, so shifting time forward by 0.05 simulates a
+            # 50ms wall-clock wait without actually sleeping.
+            import app.utils.circuit_breaker as _cb_mod
+
+            original = _cb_mod.time.time
+            _cb_mod.time.time = lambda: original() + 0.05
             assert cb.state == CircuitState.HALF_OPEN
 
             # Simulate a successful context acquisition

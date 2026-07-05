@@ -49,12 +49,16 @@ class TestTransactionalPriorityQueue:
         assert entry is not None
         assert entry.trace_id == "t2"
 
-    def test_aging_prevents_starvation(self) -> None:
+    def test_aging_prevents_starvation(self, monkeypatch) -> None:
         q = TransactionalPriorityQueue(max_size=100, aging_interval=0.01)
         q.push(PriorityLevel.BACKGROUND, "bg1", trace_id="bg1")
         q.push(PriorityLevel.CRITICAL, "crit1", trace_id="crit1")
         q.push(PriorityLevel.BACKGROUND, "bg2", trace_id="bg2")
-        time.sleep(0.05)
+        # Deterministic clock advance instead of time.sleep(0.05). The
+        # aging_interval is 0.01s — the slack is plenty, but skip the
+        # real sleep for speed and to be robust to CI load spikes.
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.05)
         q._maybe_age()
         q._maybe_age()
         q._maybe_age()

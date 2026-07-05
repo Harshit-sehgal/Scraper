@@ -59,13 +59,24 @@ def _generate_test_key() -> str:
     return f"_test_sliding_window_{os.urandom(4).hex()}_"
 
 
-def test_db_sliding_window_counter_sqlite() -> None:
+def test_db_sliding_window_counter_sqlite(monkeypatch) -> None:
     """Verify that DatabaseSlidingWindowCounter behaves correctly using SQLite storage.
 
     Uses a randomly generated unique key to avoid colliding with other tests that share
     the same rate_limits table. Cleans up test data before and after from the
     active backend (SQLite or Postgres).
     """
+    # Deterministic clock advance: replace the 2.1s sleep with a fake time
+    # that jumps 2.0+ seconds. The real sleep was both slow and flaky under
+    # CPU contention (window_seconds=2.0 with a 100ms slop is fragile).
+    original_time = time.time
+
+    def _fake_now() -> float:
+        return _fake_now.t  # type: ignore[attr-defined]
+
+    _fake_now.t = original_time()  # type: ignore[attr-defined]
+    monkeypatch.setattr("time.time", _fake_now)
+
     test_key = _generate_test_key()
     _cleanup_rate_limit_key(test_key)
     counter = DatabaseSlidingWindowCounter(max_requests=3, window_seconds=2.0, key=test_key)
@@ -87,8 +98,8 @@ def test_db_sliding_window_counter_sqlite() -> None:
         # Fourth request should be blocked
         assert counter.allow() is False
 
-        # Wait for the window to reset
-        time.sleep(2.1)
+        # Advance the fake clock past the 2.0s window instead of sleeping.
+        _fake_now.t = original_time() + 2.1  # type: ignore[attr-defined]
         assert counter.remaining() == 3
         assert counter.allow() is True
         assert counter.remaining() == 2

@@ -135,9 +135,13 @@ class TestMarkRateLimitedAndCooldown:
         b_cooldown = get_cooldown_seconds("domain-b.com")
         assert abs(a_cooldown - b_cooldown) > 5.0
 
-    def test_cooldown_expires_over_time(self) -> None:
+    def test_cooldown_expires_over_time(self, monkeypatch) -> None:
         mark_rate_limited("fast-expire", retry_after=0.001, max_cooldown=0.1)
-        time.sleep(0.15)
+        # Deterministic clock advance instead of time.sleep(0.15). The
+        # actual cooldown is 0.001s and the test sleeps 0.15s — fast but
+        # still flaky under CI load.
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.15)
         assert get_cooldown_seconds("fast-expire") == 0.0
 
     def test_large_state_eviction(self) -> None:

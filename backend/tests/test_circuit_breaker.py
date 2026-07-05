@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 from app.utils.circuit_breaker import (
     CircuitBreaker,
@@ -12,6 +10,19 @@ from app.utils.circuit_breaker import (
     get_all_circuit_breakers,
     get_circuit_breaker_stats,
 )
+
+
+def _advance_circuit_breaker_clock(seconds: float) -> None:
+    """Patch ``app.utils.circuit_breaker.time.time`` so OPEN→HALF_OPEN
+    transitions fire deterministically without a real sleep.
+
+    The breaker stores ``time.time()`` at failure time and compares it to
+    ``time.time()`` later — so we shift the clock forward by ``seconds``.
+    """
+    import app.utils.circuit_breaker as _cb_mod
+
+    original = _cb_mod.time.time
+    _cb_mod.time.time = lambda: original() + seconds
 
 
 @pytest.mark.asyncio
@@ -81,8 +92,11 @@ class TestCircuitBreaker:
 
         assert breaker.state == CircuitState.OPEN
 
-        # Sleep to exceed recovery timeout
-        await asyncio.sleep(0.02)
+        # Deterministic clock advance: ergonomic + reliable across CI.
+        # The breaker compares ``time.time() - _last_failure_time`` to
+        # ``recovery_timeout``, so shifting time forward by 0.02 simulates
+        # a 20ms wall-clock wait without actually sleeping.
+        _advance_circuit_breaker_clock(0.02)
 
         assert breaker.state == CircuitState.HALF_OPEN
 
@@ -97,7 +111,7 @@ class TestCircuitBreaker:
         except ValueError:
             pass
 
-        await asyncio.sleep(0.02)
+        _advance_circuit_breaker_clock(0.02)
         assert breaker.state == CircuitState.HALF_OPEN
 
         # Successful call
@@ -121,7 +135,7 @@ class TestCircuitBreaker:
             except ValueError:
                 pass
 
-        await asyncio.sleep(0.02)
+        _advance_circuit_breaker_clock(0.02)
         assert breaker.state == CircuitState.HALF_OPEN
 
         # Failed call in HALF_OPEN

@@ -59,12 +59,16 @@ class TestSlidingWindowCounter:
         c.allow()
         assert c.is_expired() is False
 
-    def test_window_slides_after_window_passes(self) -> None:
+    def test_window_slides_after_window_passes(self, monkeypatch) -> None:
         c = SlidingWindowCounter(2, 0.05)
         assert c.allow() is True
         assert c.allow() is True
         assert c.allow() is False
-        time.sleep(0.06)
+        # Deterministic clock advance instead of time.sleep(0.06) which is slow
+        # and flaky under CPU contention (window_seconds=0.05 is easily missed).
+        # Capture the original time.time before patching to avoid recursive capture.
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.06)
         assert c.allow() is True
 
     def test_remaining_exhausted(self) -> None:
@@ -374,10 +378,12 @@ class TestDomainCooldownTracker:
         assert allowed is False
         assert wait > 0.0
 
-    def test_cooldown_expires(self) -> None:
+    def test_cooldown_expires(self, monkeypatch) -> None:
         tracker = DomainCooldownTracker(default_cooldown_seconds=0.05)
         tracker.record_hit("example.com")
-        time.sleep(0.06)
+        # Deterministic clock advance: skip the real 0.06s sleep.
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.06)
         allowed, wait = tracker.check("example.com")
         assert allowed is True
         assert wait == 0.0
@@ -388,16 +394,20 @@ class TestDomainCooldownTracker:
         allowed, _ = tracker.check("other.com")
         assert allowed is True
 
-    def test_custom_cooldown_overrides_default(self) -> None:
+    def test_custom_cooldown_overrides_default(self, monkeypatch) -> None:
         tracker = DomainCooldownTracker(default_cooldown_seconds=10.0)
         tracker.record_hit("example.com")
-        import time as _time
-
-        _time.sleep(0.005)
+        # Deterministic clock advance instead of time.sleep(0.005).
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.005)
         allowed, _ = tracker.check("example.com", cooldown_seconds=0.001)
         assert allowed is True
 
-    def test_wait_if_needed_blocks(self) -> None:
+    def test_wait_if_needed_blocks(self, monkeypatch) -> None:
+        # wait_if_needed's internal time.sleep is incidental — the returned
+        # `waited` value comes from check(), not the actual sleep duration.
+        # Mock time.sleep to keep the test fast and skip the wall-clock wait.
+        monkeypatch.setattr("time.sleep", lambda _seconds: None)
         tracker = DomainCooldownTracker(default_cooldown_seconds=0.1)
         tracker.record_hit("example.com")
         waited = tracker.wait_if_needed("example.com")
@@ -409,7 +419,14 @@ class TestDomainCooldownTracker:
         assert waited == 0.0
 
     @pytest.mark.asyncio
-    async def test_async_wait_if_needed(self) -> None:
+    async def test_async_wait_if_needed(self, monkeypatch) -> None:
+        # async_wait_if_needed's asyncio.sleep is incidental — the returned
+        # `waited` value comes from check(). Mock asyncio.sleep to keep the
+        # test fast and skip the wall-clock wait.
+        async def _fake_sleep(_seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr("asyncio.sleep", _fake_sleep)
         tracker = DomainCooldownTracker(default_cooldown_seconds=0.05)
         tracker.record_hit("example.com")
         waited = await tracker.async_wait_if_needed("example.com")
@@ -500,10 +517,11 @@ class TestJobRateLimiter:
         assert allowed is False
         assert wait > 0.0
 
-    def test_domain_cooldown_expires(self) -> None:
+    def test_domain_cooldown_expires(self, monkeypatch) -> None:
         limiter = JobRateLimiter(max_concurrent_per_user=5, default_domain_cooldown_seconds=0.05)
         limiter.record_domain_fetch("user1", "example.com")
-        time.sleep(0.06)
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.06)
         allowed, wait = limiter.check_domain_before_fetch("user1", "example.com")
         assert allowed is True
         assert wait == 0.0
@@ -516,12 +534,11 @@ class TestJobRateLimiter:
         allowed, _ = limiter.check_domain_before_fetch("user1", "example.com", job_id="job-b")
         assert allowed is False
 
-    def test_custom_cooldown_override(self) -> None:
+    def test_custom_cooldown_override(self, monkeypatch) -> None:
         limiter = JobRateLimiter(max_concurrent_per_user=5, default_domain_cooldown_seconds=10.0)
         limiter.record_domain_fetch("user1", "example.com")
-        import time as _time
-
-        _time.sleep(0.005)
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.005)
         allowed, _ = limiter.check_domain_before_fetch(
             "user1",
             "example.com",
@@ -529,7 +546,10 @@ class TestJobRateLimiter:
         )
         assert allowed is True
 
-    def test_wait_for_domain(self) -> None:
+    def test_wait_for_domain(self, monkeypatch) -> None:
+        # wait_for_domain's internal time.sleep is incidental — the returned
+        # `waited` is from check(). Mock time.sleep to keep the test fast.
+        monkeypatch.setattr("time.sleep", lambda _seconds: None)
         limiter = JobRateLimiter(max_concurrent_per_user=5, default_domain_cooldown_seconds=0.1)
         limiter.record_domain_fetch("user1", "example.com")
         waited = limiter.wait_for_domain("user1", "example.com")
@@ -541,7 +561,13 @@ class TestJobRateLimiter:
         assert waited == 0.0
 
     @pytest.mark.asyncio
-    async def test_async_wait_for_domain(self) -> None:
+    async def test_async_wait_for_domain(self, monkeypatch) -> None:
+        # async_wait_for_domain's asyncio.sleep is incidental — the returned
+        # `waited` is from check(). Mock asyncio.sleep to keep the test fast.
+        async def _fake_sleep(_seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr("asyncio.sleep", _fake_sleep)
         limiter = JobRateLimiter(max_concurrent_per_user=5, default_domain_cooldown_seconds=0.05)
         limiter.record_domain_fetch("user1", "example.com")
         waited = await limiter.async_wait_for_domain("user1", "example.com")

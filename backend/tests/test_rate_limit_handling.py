@@ -129,10 +129,13 @@ class TestDomainCooldownIntegration:
         allowed, _ = tracker.check("target.example.com")
         assert allowed is False
 
-    def test_domain_releases_after_cooldown(self) -> None:
+    def test_domain_releases_after_cooldown(self, monkeypatch) -> None:
         tracker = DomainCooldownTracker(default_cooldown_seconds=0.05)
         tracker.record_hit("target.example.com")
-        time.sleep(0.06)
+        # Skip the real 0.06s sleep with a controllable clock. The 50ms
+        # window is tight under CI load.
+        original_time = time.time
+        monkeypatch.setattr("time.time", lambda: original_time() + 0.06)
         allowed, _ = tracker.check("target.example.com")
         assert allowed is True
 
