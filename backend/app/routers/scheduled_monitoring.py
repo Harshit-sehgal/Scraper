@@ -78,7 +78,8 @@ def _validate_urls(urls: list[str]) -> list[str]:
         try:
             validate_public_http_url(u)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=f"URL failed security check: {exc}") from exc
+            logger.warning("URL security check failed: %s", exc)
+            raise HTTPException(status_code=400, detail="URL validation failed") from exc
         cleaned.append(u)
     return cleaned
 

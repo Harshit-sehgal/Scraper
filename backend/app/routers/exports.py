@@ -139,7 +139,11 @@ def _record_export_usage(user_id: str, fmt: str, job_ids: list[str], request: Re
             idempotency_key=_export_idempotency_key(request, fmt, job_ids),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=429, detail=str(exc)) from exc
+        logger.warning("Export quota exceeded: %s", exc)
+        raise HTTPException(
+            status_code=429,
+            detail="Export quota exceeded. Please wait or upgrade your plan.",
+        ) from exc
 
 
 def _log_export_access(

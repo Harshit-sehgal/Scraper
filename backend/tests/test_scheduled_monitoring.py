@@ -300,7 +300,7 @@ class TestScheduledMonitoringEndpoints:
             "/api/scheduled?name=Bad&job_name=Bad&urls=http://localhost:8080/",
         )
         assert resp.status_code == 400
-        assert "security check" in resp.json()["detail"].lower()
+        assert "url validation failed" in resp.json()["detail"].lower()
 
     def test_create_rejects_metadata_endpoint(self, client: TestClient):
         """Creating a scheduled job with the AWS metadata IP must 400."""

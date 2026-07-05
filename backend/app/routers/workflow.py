@@ -219,7 +219,11 @@ async def create_workflow_draft_from_url_analysis(
         if req.selected_start_url:
             validate_public_http_url(req.selected_start_url)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"Unsafe workflow URL: {exc}") from exc
+        logger.warning("Unsafe workflow URL: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Unsafe workflow URL: does not meet public-host requirements",
+        ) from exc
 
     role, user_id, org_id, project_id = auth
     analysis = analyze_guided_url(req.original_url).to_guided_dict(safe_to_fetch=True)
@@ -263,7 +267,11 @@ async def detect_workflow_draft_fields(
         try:
             validate_public_http_url(start_url)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=f"Unsafe workflow start URL: {exc}") from exc
+            logger.warning("Unsafe workflow start URL: %s", exc)
+            raise HTTPException(
+                status_code=400,
+                detail="Unsafe workflow start URL: does not meet public-host requirements",
+            ) from exc
     if not req.html_snapshot:
         raise HTTPException(status_code=400, detail="html_snapshot is required for deterministic field detection.")
     fields = detect_fields_from_html(req.html_snapshot)

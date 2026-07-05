@@ -154,10 +154,11 @@ def _wait_for_notifier_thread() -> None:
             t.join(timeout=2)
             return
     # If the thread has already finished, it is no longer in enumerate().
-    # Give the runtime a moment to clean up; this is best-effort.
+    # Yield once so any tear-down scheduled on the runtime can run; this
+    # is best-effort and does not require a real sleep.
     import time
 
-    time.sleep(0.05)
+    time.sleep(0)
 
 
 class TestHighLevelHelpers:

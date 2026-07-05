@@ -149,17 +149,23 @@ async def test_rate_limit_prune_loop_runs_one_iteration(monkeypatch) -> None:
     # to verify it was invoked by the loop. ``DatabaseSlidingWindowCounter``
     # is imported lazily inside ``_rate_limit_prune_loop``, so the patch
     # must target the module where the class is defined, not lifespan.
-    mock_prune = MagicMock()
+    prune_called = asyncio.Event()
+
+    def _on_prune() -> None:
+        prune_called.set()
+
+    mock_prune = MagicMock(side_effect=_on_prune)
     with patch("app.rate_limiter.DatabaseSlidingWindowCounter.prune_all", mock_prune):
-        # Patch the interval to 0.1s so the sleep is short.
-        with patch("app.lifespan.settings.RATE_LIMIT_PRUNE_INTERVAL", 0.1):
+        # Patch the interval to a small value so we don't block long.
+        with patch("app.lifespan.settings.RATE_LIMIT_PRUNE_INTERVAL", 0.01):
             task = asyncio.create_task(_rate_limit_prune_loop())
-            # Let it sleep for the 0.1s interval and run prune_all once.
-            await asyncio.sleep(0.3)
+            # Wait until the loop has actually executed prune_all once.
+            # This is deterministic — no real long sleep is needed.
+            await asyncio.wait_for(prune_called.wait(), timeout=2)
             task.cancel()
-            # Wait for cancellation to propagate.
+            # Let cancellation propagate.
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    # prune_all should have been called at least once.
+    # prune_all should have been called exactly once at this point.
     assert mock_prune.called, "prune_all was not called during the prune loop iteration"

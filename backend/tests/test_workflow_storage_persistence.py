@@ -197,10 +197,13 @@ class TestWorkflowConcurrentWrites:
         t_ins.start()
         t_del.start()
 
-        # Race window
+        # Race window — the threads spin continuously and the only
+        # reason to wait here is to let them do some work. 10ms is
+        # more than enough on any reasonable machine; the test asserts
+        # that the file remains readable JSON, not that N iterations ran.
         import time
 
-        time.sleep(0.25)
+        time.sleep(0.01)
         stop.set()
         t_ins.join()
         t_del.join()

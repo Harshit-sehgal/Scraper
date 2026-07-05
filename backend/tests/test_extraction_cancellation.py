@@ -30,12 +30,20 @@ class TestExtractionCancellation:
 
         config = PaginationConfig(strategy="next_button", max_pages=10, delay_between_pages=0.1)
 
+        # Hold the extract coroutine on an Event that we never set.
+        # This blocks it deterministically inside the ``with`` block of
+        # ``async_paginate`` — ``task.cancel()`` then raises CancelledError
+        # from the await point instantly, with no real sleep involved.
+        blocker = asyncio.Event()
+
         async def extract(page) -> list[dict]:
-            await asyncio.sleep(0.05)
+            await blocker.wait()
             return [{"data": "test"}]
 
         task = asyncio.create_task(async_paginate(page, config, extract))
-        await asyncio.sleep(0.02)
+        # Yield once so the task is actually scheduled and reaches its
+        # blocking await before we cancel it.
+        await asyncio.sleep(0)
         task.cancel()
         try:
             await task

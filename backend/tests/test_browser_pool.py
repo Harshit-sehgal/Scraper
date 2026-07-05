@@ -900,23 +900,30 @@ class TestConcurrencyCap:
         ):
             acquired = []
             release_events: list[asyncio.Event] = [asyncio.Event() for _ in range(3)]
+            # Per-holder "acquired" events so we can assert the cap is
+            # reached deterministically without flaky sleeps.
+            acquired_events: list[asyncio.Event] = [asyncio.Event() for _ in range(3)]
 
             async def holder(idx: int) -> None:
                 mock_ctx = _sync_mock_context()
                 mock_browser.new_context.return_value = mock_ctx
                 async with pool.acquire_context() as (ctx_id, _ctx):
                     acquired.append(ctx_id)
-                    # Hold until told to release
+                    # Signal that we've acquired the slot, then hold.
+                    acquired_events[idx].set()
                     await release_events[idx].wait()
 
-            # Acquire 2 slots (cap = 2)
+            # Acquire 2 slots (cap = 2). Wait deterministically on both
+            # holders reporting they've acquired before asserting state.
             t0 = asyncio.create_task(holder(0))
             t1 = asyncio.create_task(holder(1))
-            # Give them time to acquire
-            await asyncio.sleep(0.05)
+            await asyncio.gather(acquired_events[0].wait(), acquired_events[1].wait())
             assert pool._active_acquires == 2
 
-            # 3rd attempt should block
+            # 3rd attempt should block on the semaphore. We track
+            # both "started" (entered the acquire attempt) and "acquired"
+            # (got the slot) — the started event makes the test fail
+            # loudly if the 3rd attempt never even reached the queue.
             t2_started = asyncio.Event()
 
             async def holder2() -> None:
@@ -925,16 +932,23 @@ class TestConcurrencyCap:
                 mock_browser.new_context.return_value = mock_ctx
                 async with pool.acquire_context() as (ctx_id, _ctx):
                     acquired.append(ctx_id)
+                    acquired_events[2].set()
                     await release_events[2].wait()
 
             t2 = asyncio.create_task(holder2())
-            await asyncio.sleep(0.05)
-            # t2 should be waiting on the semaphore — active acquires still 2
+            # Yield until holder2 has started its acquire attempt — this
+            # is enough for t2 to be parked on the semaphore without a
+            # real long sleep.
+            await t2_started.wait()
+            # Confirm t2 has not acquired by giving it a chance to observe
+            # the now-full cap; one extra loop tick is sufficient.
+            await asyncio.sleep(0)
             assert pool._active_acquires == 2
 
-            # Release slot 0 — now t2 should acquire
+            # Release slot 0 — t2 should wake up and acquire. Wait for
+            # t2's "acquired" event so we don't poll with sleeps.
             release_events[0].set()
-            await asyncio.sleep(0.05)
+            await acquired_events[2].wait()
             assert pool._active_acquires == 2  # t2 got the slot
 
             # Cleanup

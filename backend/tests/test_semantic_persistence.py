@@ -56,9 +56,17 @@ def test_persistence_round_trip() -> None:
 
     # 4. Save state
     save_semantic_state()
+    # Poll briefly for the state file to appear with non-trivial size —
+    # the underlying save already does fsync+os.replace so this rarely
+    # requires any retry, but yields control to let any scheduled I/O
+    # finish under heavy CI load.
     import time
 
-    time.sleep(0.1)  # Wait for filesystem sync
+    deadline = time.monotonic() + 0.5
+    while time.monotonic() < deadline:
+        if os.path.exists(test_path):
+            break
+        time.sleep(0.01)
     # 5. Clear in-memory state
     clear_semantic_state(clear_file=False)
     reng.load_cache({})  # clear in-memory cache
