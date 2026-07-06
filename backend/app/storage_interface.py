@@ -856,13 +856,11 @@ class SQLiteJobRepository(JobRepository):
         ws_path = _get_db_path().parent / "world_state.json"
         if not ws_path.exists():
             return None
-        if ws_path.exists():
-            try:
-                return json.loads(ws_path.read_text())  # type: ignore[no-any-return]
-            except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
-                logger.debug("Failed to parse world_state.json", exc_info=True)
-                return None
-        return None
+        try:
+            return json.loads(ws_path.read_text())  # type: ignore[no-any-return]
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError):
+            logger.debug("Failed to parse world_state.json", exc_info=True)
+            return None
 
     def move_to_recycle_bin(self, job_id: str) -> bool:
         """Move a job to the recycle bin atomically in SQLite."""

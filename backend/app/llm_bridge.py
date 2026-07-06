@@ -7,6 +7,8 @@ All tool-calls must be traceable and governed by the Substrate Policy Engine.
 import asyncio
 import json
 import logging
+import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from typing import Any
@@ -1082,9 +1084,6 @@ class SubstratePluginManager:
             )
 
         # Subprocess sandbox uses a fixed interpreter argv and never shell=True.
-        import subprocess  # nosec B404
-        import sys
-
         try:
             # Serialize the handler invocation for the subprocess worker.
             # The qualname walk inside the subprocess is only safe because

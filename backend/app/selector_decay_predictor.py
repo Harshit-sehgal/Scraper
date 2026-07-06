@@ -18,8 +18,10 @@ LAW: Selectors decay predictably. The system must anticipate failure before it h
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
+import sys
 import threading
 import time
 from collections import defaultdict
@@ -113,9 +115,6 @@ class SelectorDecayPredictor:
                     os.unlink(tmp_path)
 
     def _load(self) -> None:
-        import json
-        import sys
-
         from app.config import settings
 
         if "pytest" in sys.modules and not settings.TEST_SELECTOR_DECAY_PERSISTENCE:

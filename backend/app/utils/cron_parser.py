@@ -31,6 +31,7 @@ five-field subset has not been worth the cost.
 
 import datetime
 import re
+import sys
 from collections.abc import Sequence
 
 # ── Field metadata ────────────────────────────────────────────────────
@@ -353,8 +354,6 @@ __all__ = [
 
 # ── Lightweight runtime checks for development ───────────────────────
 if __name__ == "__main__":  # pragma: no cover
-    import sys
-
     samples: Sequence[tuple[str, datetime.datetime, datetime.datetime]] = [
         (
             "*/5 * * * *",
