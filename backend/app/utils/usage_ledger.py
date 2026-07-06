@@ -107,15 +107,16 @@ class UsageLedger:
     def _idempotency_key(self, user_id: str, usage_type: UsageType, idempotency_key: str) -> str:
         return f"{user_id}:{usage_type.value}:{idempotency_key}"
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self) -> _SqliteConnCtx:
+        # Returns a context-manager so ``with self._connect() as conn:``
+        # closes the SQLite connection on exit.  ``sqlite3``'s native
+        # connection context manager only manages transactions — it does
+        # NOT close the connection, which leaks file descriptors under
+        # sustained load.
         if self._storage_path is None:
             msg = "Usage ledger storage is not configured"
             raise RuntimeError(msg)
-        conn = sqlite3.connect(str(self._storage_path))
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=FULL")
-        conn.row_factory = sqlite3.Row
-        return conn
+        return _SqliteConnCtx(str(self._storage_path))
 
     def _init_storage(self) -> None:
         with self._connect() as conn:
@@ -515,6 +516,36 @@ class UsageLedger:
             except (ImportError, OSError, RuntimeError, ValueError, TypeError) as exc:
                 logger.warning("[UsageLedger] quota_reset audit emit failed: %s", exc)
             return reset_count
+
+
+class _SqliteConnCtx:
+    """Context-managed SQLite connection that actually closes the file.
+
+    Python's built-in ``sqlite3.connect(...)`` context manager only
+    manages transaction commit/rollback.  The connection itself stays
+    open until garbage-collected — that's a file-descriptor leak under
+    sustained load.  Use this wrapper everywhere we need a connection
+    that closes deterministically.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._conn: sqlite3.Connection | None = sqlite3.connect(path)
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=FULL")
+        self._conn.row_factory = sqlite3.Row
+
+    def __enter__(self) -> sqlite3.Connection:
+        if self._conn is None:
+            msg = "Connection already closed"
+            raise RuntimeError(msg)
+        return self._conn
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            finally:
+                self._conn = None
 
 
 def _format_dt(value: datetime | None) -> str | None:

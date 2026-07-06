@@ -105,6 +105,33 @@ class DenylistEntry:
         return (parsed.path or "/").startswith(self.path_prefix)
 
 
+class _SqliteConnCtxWrapper:
+    """Context-managed SQLite connection that actually closes the file.
+
+    Python's built-in ``sqlite3.connect(...)`` context manager only
+    manages transaction commit/rollback.  The connection itself stays
+    open until garbage-collected — a file-descriptor leak under
+    sustained load.  Use this wrapper everywhere we need a connection
+    that closes deterministically.
+    """
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn: sqlite3.Connection | None = conn
+
+    def __enter__(self) -> sqlite3.Connection:
+        if self._conn is None:
+            msg = "Connection already closed"
+            raise RuntimeError(msg)
+        return self._conn
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            finally:
+                self._conn = None
+
+
 class DomainDenylist:
     """Persistent admin domain denylist.
 
@@ -121,12 +148,15 @@ class DomainDenylist:
 
     # ── Schema ──────────────────────────────────────────────────────
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self) -> _SqliteConnCtxWrapper:
+        # Returns a context manager that closes the connection on exit.
+        # ``sqlite3.connect(...)``'s native context manager only manages
+        # transaction commit/rollback; the FD leaks until GC.
         conn = sqlite3.connect(self._db_path, timeout=10, isolation_level=None)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=FULL")
         conn.row_factory = sqlite3.Row
-        return conn
+        return _SqliteConnCtxWrapper(conn)
 
     def _ensure_schema(self) -> None:
         with self._lock, self._connect() as conn:
