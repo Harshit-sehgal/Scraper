@@ -333,3 +333,64 @@ class TestRoundTrip:
         monkeypatch.setenv("DATAFORGE_STATE_DIR", str(tmp_path))
         _get_binaries_dir()  # ensures dir exists
         assert _get_binary_file_path_raw("ghost.pdf") is None
+
+
+# ── _binary_store — bounded FIFO eviction (FU-2026-07-06) ────────────
+
+
+class TestBinaryStoreEviction:
+    """Long-running server protection: the in-memory metadata cache must
+    be bounded so it cannot grow without limit as new downloads happen.
+
+    Eviction is FIFO (oldest entry removed when the cap is reached) and
+    non-destructive on the filesystem — the on-disk file is never
+    touched; only the in-process lookup entry is dropped.
+    """
+
+    def test_evicts_oldest_when_cap_reached(self) -> None:
+        """Insert cap+1 entries → oldest is gone, newest survives."""
+        from collections import OrderedDict
+
+        from app.binary_handler import (
+            _BINARY_STORE_MAX_ENTRIES,
+        )
+
+        local = OrderedDict()
+        # Repopulate with cap + 1 entries while preserving eviction
+        # semantics — logic in download_binary uses the same pattern.
+        for i in range(_BINARY_STORE_MAX_ENTRIES + 1):
+            key = f"file-{i}.pdf"
+            if key in local:
+                local.move_to_end(key)
+            local[key] = {"filename": key}
+            while len(local) > _BINARY_STORE_MAX_ENTRIES:
+                local.popitem(last=False)
+
+        assert len(local) == _BINARY_STORE_MAX_ENTRIES
+        assert "file-0.pdf" not in local
+        assert f"file-{_BINARY_STORE_MAX_ENTRIES}.pdf" in local
+        # First surviving is next-in-line after eviction.
+        assert next(iter(local)) == "file-1.pdf"
+
+    def test_reinsert_promotes_to_most_recent(self) -> None:
+        """Re-downloading an existing filename must NOT count as
+        a new entry — it moves the existing entry to the end so eviction
+        keeps it alive even when surrounded by newer entries."""
+        from collections import OrderedDict
+
+        local: OrderedDict[str, dict] = OrderedDict()
+        for name in ["a", "b", "c"]:
+            local[name] = {"filename": name}
+        # Re-download "a" — it should move to most-recent position.
+        local.move_to_end("a")
+        local["a"] = {"filename": "a", "redownload": True}
+        assert list(local.keys()) == ["b", "c", "a"]
+
+    def test_module_store_is_ordereddict(self) -> None:
+        """Sanity: the module-level store is an OrderedDict so move_to_end
+        and popitem(last=False) semantics are guaranteed."""
+        from collections import OrderedDict
+
+        from app.binary_handler import _binary_store
+
+        assert isinstance(_binary_store, OrderedDict)

@@ -24,6 +24,7 @@ import os
 import re
 import threading
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -145,8 +146,14 @@ _UNSAFE_CONTENT_TYPES: frozenset[str] = frozenset(
     },
 )
 
-# Thread-safe store for downloaded binary metadata
-_binary_store: dict[str, dict[str, Any]] = {}
+# Thread-safe store for downloaded binary metadata.
+# Bounded FIFO cache: in long-running servers the in-memory lookup dict
+# would otherwise grow without limit (one entry per download ever made
+# this process lifetime). When the cap is reached, the oldest entry is
+# evicted on the next insert. Falls back to filesystem lookup if the
+# caller misses the cache (see ``get_binary_metadata`` docstring).
+_BINARY_STORE_MAX_ENTRIES = 1024
+_binary_store: OrderedDict[str, dict[str, Any]] = OrderedDict()
 _binary_store_lock = threading.Lock()
 
 
@@ -465,9 +472,17 @@ async def download_binary(
             }
         )
 
-    # Record in the in-memory store so the download endpoint can serve it
+    # Record in the in-memory store so the download endpoint can serve it.
+    # FIFO cap to bound memory growth in long-running servers; the
+    # filesystem is the source of truth so eviction is non-destructive
+    # (the download endpoint already falls back to disk lookup).
     with _binary_store_lock:
+        if filename in _binary_store:
+            # Move to most-recent to avoid double counting a re-download
+            _binary_store.move_to_end(filename)
         _binary_store[filename] = meta
+        while len(_binary_store) > _BINARY_STORE_MAX_ENTRIES:
+            _binary_store.popitem(last=False)
 
     logger.info(
         "Downloaded binary %s (%s, %d bytes) from %s",
