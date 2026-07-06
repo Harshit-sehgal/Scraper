@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sqlite3
 import threading
 from abc import ABC, abstractmethod
@@ -522,8 +523,6 @@ def get_workflow_repository() -> WorkflowRepository:
     with _WORKFLOW_REPO_LOCK:
         if _workflow_repo_instance is not None:
             return _workflow_repo_instance
-
-        import os
 
         backend = os.environ.get("DATAFORGE_WORKFLOW_BACKEND", "").strip().lower()
         if not backend:

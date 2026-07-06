@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
 from typing import Any, Self
 
 from app.models import JobStatus
@@ -30,8 +31,6 @@ def _get_days(key: str, default: int) -> int:
     Tries ``app.config.settings`` first, then ``os.environ``, then
     the provided *default*.
     """
-    import os
-
     try:
         from app.config import settings
 

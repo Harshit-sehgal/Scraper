@@ -1,4 +1,8 @@
+import contextlib
+import json
 import logging
+import os
+import tempfile
 import threading
 from abc import ABC, abstractmethod
 from typing import Any
@@ -815,10 +819,6 @@ class SQLiteJobRepository(JobRepository):
 
     def save_world_state(self, payload: dict[str, Any]) -> None:
         """Save semantic world state to the SQLite world_state.json file atomically."""
-        import contextlib
-        import json
-        import os
-        import tempfile
 
         from app.job_store import _get_db_path
 
@@ -850,11 +850,12 @@ class SQLiteJobRepository(JobRepository):
 
     def load_world_state(self) -> dict | None:
         """Load semantic world state from the SQLite world_state.json file."""
-        import json
 
         from app.job_store import _get_db_path
 
         ws_path = _get_db_path().parent / "world_state.json"
+        if not ws_path.exists():
+            return None
         if ws_path.exists():
             try:
                 return json.loads(ws_path.read_text())  # type: ignore[no-any-return]

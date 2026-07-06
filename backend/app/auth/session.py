@@ -18,6 +18,8 @@ import sqlite3
 import threading
 import time
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,12 +47,24 @@ def _session_db_path() -> Path:
     return path
 
 
-def _connect_session_db() -> sqlite3.Connection:
+@contextmanager
+def _connect_session_db() -> Iterator[sqlite3.Connection]:
+    """Yield a session-DB connection that guarantees close() on exit.
+
+    Memory note (session-2026-07-06): session-DB connections were leaking
+    because every call site opened a bare ``sqlite3.connect(...)`` and the
+    cursor was never closed.  Wrap every call in
+    ``with _connect_session_db() as conn`` so that the connection is
+    closed even if the consumer raises mid-transaction.
+    """
     conn = sqlite3.connect(str(_session_db_path()), timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=FULL")
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def _ensure_session_schema() -> None:
@@ -240,8 +254,6 @@ def _unsign(signed: str) -> str | None:
 
     # H11: Try rotated keys
     try:
-        import os
-
         rotated = os.environ.get("DATAFORGE_SESSION_SECRET_ROTATED", "").strip()
         if rotated:
             for old_secret in rotated.split(";"):
