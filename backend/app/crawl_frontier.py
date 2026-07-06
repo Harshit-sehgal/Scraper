@@ -242,6 +242,14 @@ class CrawlFrontier:
         if not url or not url.startswith("http"):
             return False
 
+        # M3: perform in-memory mutation under the lock, then release the
+        # lock and persist to SQLite outside of it. Holding _lock across
+        # ``run_in_threadpool`` serialized concurrent add_url/mark_completed
+        # callers behind one another's SQLite I/O. The rollback path on
+        # DB write failure still re-acquires the lock briefly to restore
+        # in-memory state — concrete failure recovery, not silent drift.
+        item_priority = priority + (depth * 5)
+        item = CrawlItem(priority=item_priority, url=url, depth=depth, source_url=source_url)
         async with self._lock:
             # 1. Deduplication
             if url in self._completed or url in self._pending:
@@ -261,117 +269,145 @@ class CrawlFrontier:
                 )
                 return False
 
-            # 2. Priority calculation (lower = higher priority)
-            # Higher depth = lower priority
-            item_priority = priority + (depth * 5)
-
-            item = CrawlItem(priority=item_priority, url=url, depth=depth, source_url=source_url)
+            # 2. Priority calculation (lower = higher priority) is already
+            # captured above; mutate heap + pending set so dedupe/heap-order
+            # invariants remain coherent under the lock.
             heapq.heappush(self._queue, item)
             self._pending.add(url)
 
-            try:
-                await run_in_threadpool(
-                    _db_insert_queue,
-                    self._db_path,
-                    item_priority,
-                    url,
-                    depth,
-                    source_url,
-                    item.added_at,
-                )
-            except _DB_FALLBACK_ERRORS:
-                # M5: DB write failed — undo in-memory mutation so
-                # frontier doesn't diverge from persistent storage.
-                logger.exception("Failed to insert URL into SQLite; reverting in-memory add")
+        # Outside the lock: persist the new queue row concurrently with
+        # other frontier operations.
+        try:
+            await run_in_threadpool(
+                _db_insert_queue,
+                self._db_path,
+                item.priority,
+                url,
+                depth,
+                source_url,
+                item.added_at,
+            )
+        except _DB_FALLBACK_ERRORS:
+            # M5: DB write failed — undo in-memory mutation so
+            # frontier doesn't diverge from persistent storage.
+            logger.exception("Failed to insert URL into SQLite; reverting in-memory add")
+            async with self._lock:
                 self._pending.discard(url)
                 # Remove from heap (rebuild — heapq has no O(log n) delete)
-                self._queue = [item for item in self._queue if item.url != url]
+                self._queue = [it for it in self._queue if it.url != url]
                 heapq.heapify(self._queue)
 
-            logger.debug("[Frontier] Added URL: %s (depth: %d, priority: %d)", url, depth, item_priority)
-            return True
+        logger.debug("[Frontier] Added URL: %s (depth: %d, priority: %d)", url, depth, item_priority)
+        return True
 
     async def get_next_url(self) -> str | None:
         """Get the next URL available for crawling, respecting policy."""
+        # M3: each frontier operation now does its in-memory mutation under
+        # ``self._lock`` and releases the lock before any SQLite I/O so
+        # concurrent callers can run their own DB writes in parallel
+        # instead of serializing behind one another.
         tried: list[CrawlItem] = []
         max_retries = 1000  # safety valve: prevent unbounded queue scan
         retries = 0
 
         while retries < max_retries:
             retries += 1
-            # 1. Pop a candidate item under the lock
+            # 1. Pop a candidate item under the lock; release the lock
+            # before the SQLite delete so concurrent frontier ops don't
+            # queue behind our threadpool DB I/O.
+            popped: CrawlItem | None = None
             async with self._lock:
                 if not self._queue:
-                    # No more items in queue! Restore tried items before
-                    # returning  # noqa: ERA001, RUF100
-                    for item in tried:
-                        if item.url not in self._completed:
-                            heapq.heappush(self._queue, item)
-                            self._pending.add(item.url)
-                            try:
-                                await run_in_threadpool(
-                                    _db_insert_queue,
-                                    self._db_path,
-                                    item.priority,
-                                    item.url,
-                                    item.depth,
-                                    item.source_url,
-                                    item.added_at,
-                                )
-                            except _DB_FALLBACK_ERRORS:
-                                logger.exception("Failed to restore URL to SQLite")
-                    return None
+                    items_to_restore = [item for item in tried if item.url not in self._completed]
+                    for item in items_to_restore:
+                        heapq.heappush(self._queue, item)
+                        self._pending.add(item.url)
+                    break  # exits the while — empty queue path below re-acquires to persist
 
-                item = heapq.heappop(self._queue)
-                # Temporarily remove from pending during active policy check
-                self._pending.discard(item.url)
+                popped = heapq.heappop(self._queue)
+                # Temporarily remove from pending during the policy check.
+                self._pending.discard(popped.url)
 
-                try:
-                    await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
-                except _DB_FALLBACK_ERRORS:
-                    logger.exception("Failed to delete URL from SQLite queue")
+            # popped is guaranteed populated here (we break'd or popped above)
+            if popped is None:  # pragma: no cover
+                msg = "Frontier invariant: popped is None after queue pop"
+                raise RuntimeError(msg)
 
-            # 2. Release lock and evaluate policy check asynchronously outside
-            # the lock
-            block_reason = await self._policy.check_domain(item.url)
+            # Outside the lock: persist the queue-row delete concurrently
+            # with the policy check (which awaits).
+            try:
+                await run_in_threadpool(_db_delete_queue, self._db_path, popped.url)
+            except _DB_FALLBACK_ERRORS:
+                logger.exception("Failed to delete URL from SQLite queue")
+
+            # 2. Evaluate policy check outside the lock — the policy
+            # check is a network-touching op we never want holding _lock.
+            block_reason = await self._policy.check_domain(popped.url)
+            item = popped
 
             if not block_reason:
-                # Target is eligible! Restore its pending status and return
+                # Eligible: re-mark the URL pending, persist its row, and
+                # restore tried items to the heap under a brief lock window.
+                pending_restore: list[CrawlItem] = [item, *tried]
                 async with self._lock:
-                    self._pending.add(item.url)
+                    for it in pending_restore:
+                        if it.url not in self._completed:
+                            heapq.heappush(self._queue, it)
+                            self._pending.add(it.url)
+
+                # Outside the lock: persist all restored rows concurrently.
+                for it in pending_restore:
+                    if it.url in self._completed:
+                        continue
                     try:
                         await run_in_threadpool(
                             _db_insert_queue,
                             self._db_path,
-                            item.priority,
-                            item.url,
-                            item.depth,
-                            item.source_url,
-                            item.added_at,
+                            it.priority,
+                            it.url,
+                            it.depth,
+                            it.source_url,
+                            it.added_at,
                         )
                     except _DB_FALLBACK_ERRORS:
-                        logger.exception("Failed to restore URL to SQLite: %s", item.url)
-                    # Restore other tried items under the lock
-                    for t_item in tried:
-                        if t_item.url not in self._completed:
-                            heapq.heappush(self._queue, t_item)
-                            self._pending.add(t_item.url)
-                            try:
-                                await run_in_threadpool(
-                                    _db_insert_queue,
-                                    self._db_path,
-                                    t_item.priority,
-                                    t_item.url,
-                                    t_item.depth,
-                                    t_item.source_url,
-                                    t_item.added_at,
-                                )
-                            except _DB_FALLBACK_ERRORS:
-                                logger.exception("Failed to restore tried URL to SQLite")
+                        logger.exception(
+                            "Failed to restore URL to SQLite: %s",
+                            it.url,
+                        )
                 return item.url
-            # Blocked! Restore pending status and track in tried list
+
+            # Blocked by policy: mark the popped URL pending again under
+            # the lock, leave the heap alone (queue.pop already removed it),
+            # and persist the re-pending state outside the lock.
             async with self._lock:
                 self._pending.add(item.url)
+            try:
+                await run_in_threadpool(
+                    _db_insert_queue,
+                    self._db_path,
+                    item.priority,
+                    item.url,
+                    item.depth,
+                    item.source_url,
+                    item.added_at,
+                )
+            except _DB_FALLBACK_ERRORS:
+                logger.exception("Failed to save blocked URL")
+            tried.append(item)
+
+            if len(tried) > 20:  # Don't look too deep
+                break
+
+        # 3. Empty-queue path or trailing tried-restore when we ran out of
+        # patience. Restore tried items to the heap under the lock, then
+        # persist outside.
+        items_to_restore = [item for item in tried if item.url not in self._completed]
+        if items_to_restore:
+            async with self._lock:
+                for item in items_to_restore:
+                    heapq.heappush(self._queue, item)
+                    self._pending.add(item.url)
+            for item in items_to_restore:
                 try:
                     await run_in_threadpool(
                         _db_insert_queue,
@@ -383,35 +419,15 @@ class CrawlFrontier:
                         item.added_at,
                     )
                 except _DB_FALLBACK_ERRORS:
-                    logger.exception("Failed to save blocked URL")
-            tried.append(item)
-
-            if len(tried) > 20:  # Don't look too deep
-                break
-
-        # 3. If we searched too deep and didn't find any eligible URL,
-        # restore all tried items to the heap under the lock.
-        async with self._lock:
-            for item in tried:
-                if item.url not in self._completed:
-                    heapq.heappush(self._queue, item)
-                    self._pending.add(item.url)
-                    try:
-                        await run_in_threadpool(
-                            _db_insert_queue,
-                            self._db_path,
-                            item.priority,
-                            item.url,
-                            item.depth,
-                            item.source_url,
-                            item.added_at,
-                        )
-                    except _DB_FALLBACK_ERRORS:
-                        logger.exception("Failed to restore tried URLs")
+                    logger.exception("Failed to restore tried URLs")
         return None
 
     async def mark_completed(self, url: str, success: bool = True) -> None:
         """Mark a URL as completed or failed."""
+        # M3: perform lapped in-memory state mutation under the lock, then
+        # release before SQLite I/O to avoid serializing concurrent frontier
+        # tasks. Rollback re-acquires the lock on DB failure.
+        db_write: tuple[Any, ...]
         async with self._lock:
             if url in self._pending:
                 self._pending.remove(url)
@@ -423,41 +439,19 @@ class CrawlFrontier:
                 domain = urlparse(url).netloc
                 self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
                 self._failed.pop(url, None)
-                try:
-                    await run_in_threadpool(_db_mark_completed, self._db_path, url)
-                except _DB_FALLBACK_ERRORS:
-                    logger.exception("Failed to mark completed in SQLite")
+                db_write = (_db_mark_completed, url)
             else:
                 count = self._failed.get(url, 0) + 1
                 self._failed[url] = count
-                try:
-                    await run_in_threadpool(_db_mark_failed, self._db_path, url, count)
-                except _DB_FALLBACK_ERRORS:
-                    logger.exception("Failed to update failed count in SQLite")
+                db_write = (_db_mark_failed, url, count)
 
                 # Retry logic: if not too many failures, put back in queue with
-                # lower priority. Guard against duplicate heap entries by checking
-                # _pending (re-inserted URLs are added to _pending below).
+                # lower priority.
                 if count < settings.CRAWL_MAX_RETRIES_PER_DOMAIN and url not in self._pending:
                     item = CrawlItem(priority=100 + (count * 20), url=url, depth=0)
                     heapq.heappush(self._queue, item)
                     self._pending.add(url)
-                    try:
-                        await run_in_threadpool(
-                            _db_insert_queue,
-                            self._db_path,
-                            item.priority,
-                            url,
-                            item.depth,
-                            item.source_url,
-                            item.added_at,
-                        )
-                    except _DB_FALLBACK_ERRORS:
-                        # M5: DB write failed — undo in-memory state.
-                        logger.exception("Failed to insert retry URL in SQLite; reverting in-memory add")
-                        self._pending.discard(url)
-                        self._queue = [it for it in self._queue if it.url != url]
-                        heapq.heapify(self._queue)
+                    db_write = (_db_insert_queue, item.priority, url, item.depth, item.source_url, item.added_at)
                 else:
                     # Move to completed to stop retrying
                     self._completed.add(url)
@@ -465,10 +459,20 @@ class CrawlFrontier:
 
                     domain = urlparse(url).netloc
                     self._domain_page_counts[domain] = self._domain_page_counts.get(domain, 0) + 1
-                    try:
-                        await run_in_threadpool(_db_finalize_failed_as_completed, self._db_path, url)
-                    except _DB_FALLBACK_ERRORS:
-                        logger.exception("Failed to finalize failed URL as completed in SQLite")
+                    db_write = (_db_finalize_failed_as_completed, url)
+
+        # Outside the lock: persist the outcome concurrently
+        fn, *args = db_write
+        try:
+            await run_in_threadpool(fn, self._db_path, *args)
+        except _DB_FALLBACK_ERRORS:
+            logger.exception("Failed to persist completion state to SQLite for %s", url)
+            # If we inserted a retry, revert the in-memory mutation on failure
+            if fn == _db_insert_queue:
+                async with self._lock:
+                    self._pending.discard(url)
+                    self._queue = [it for it in self._queue if it.url != url]
+                    heapq.heapify(self._queue)
 
     async def add_discovered_links(self, links: list[str], source_url: str, source_depth: int = 0) -> int:
         """Add links discovered during extraction back to the frontier.
