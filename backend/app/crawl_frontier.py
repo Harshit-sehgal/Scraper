@@ -346,17 +346,20 @@ class CrawlFrontier:
             item = popped
 
             if not block_reason:
-                # Eligible: re-mark the URL pending, persist its row, and
-                # restore tried items to the heap under a brief lock window.
-                pending_restore: list[CrawlItem] = [item, *tried]
+                # Eligible: re-mark the URL pending (in-memory only, NOT
+                # re-pushed to heap — it was already consumed). Restore
+                # tried items to the heap under a brief lock window.
                 async with self._lock:
-                    for it in pending_restore:
+                    # Re-mark the eligible URL as pending.
+                    self._pending.add(item.url)
+                    for it in tried:
                         if it.url not in self._completed:
                             heapq.heappush(self._queue, it)
                             self._pending.add(it.url)
 
-                # Outside the lock: persist all restored rows concurrently.
-                for it in pending_restore:
+                # Re-persist the eligible URL + tried items to SQLite so
+                # they survive restart.
+                for it in [item, *tried]:
                     if it.url in self._completed:
                         continue
                     try:
@@ -528,33 +531,44 @@ class CrawlFrontier:
         Note: This pops URLs from the frontier heap, so they won't
         be returned by subsequent get_next_url() calls.
         """
-        domain_urls: list[str] = []
+        # M3: perform in-memory mutation under the lock, release before
+        # SQLite I/O so concurrent frontier operations aren't serialized.
+        domain_items: list[CrawlItem] = []
+
         async with self._lock:
-            # Collect non-matching items to re-push later
-            remaining = []
-            while self._queue and len(domain_urls) < max_urls:
+            remaining: list[CrawlItem] = []
+            while self._queue and len(domain_items) < max_urls:
                 item = heapq.heappop(self._queue)
                 if domain in urlparse(item.url).netloc:
-                    # FU-2026-07-05 (CRIT-4 consistency): if the DB delete
-                    # for a popped domain URL fails, restore the URL to the
-                    # heap and skip returning it. Otherwise in-memory and
-                    # on-disk state diverge: caller thinks the URL is
-                    # dequeued, but the DB row resurrects on restart as an
-                    # orphan the frontier has "forgotten" about.
-                    try:
-                        await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
-                    except _DB_FALLBACK_ERRORS:
-                        logger.exception("Failed to delete domain URL from SQLite; restoring to queue")
-                        heapq.heappush(self._queue, item)
-                        continue
-                    domain_urls.append(item.url)
-                    self._pending.discard(item.url)
+                    domain_items.append(item)
+                    # Keep pending intact until DB delete succeeds (below).
                 else:
                     remaining.append(item)
-            # Re-push non-domain items
+            # Re-push non-domain items immediately under the lock.
             for item in remaining:
                 heapq.heappush(self._queue, item)
-        return domain_urls
+
+        # Outside the lock: delete domain URL rows from the DB.
+        # On failure, restore the URL to the heap so in-memory
+        # and on-disk state stay consistent (FU-2026-07-05).
+        failed_urls: set[str] = set()
+        for item in domain_items:
+            try:
+                await run_in_threadpool(_db_delete_queue, self._db_path, item.url)
+            except _DB_FALLBACK_ERRORS:
+                logger.exception("Failed to delete domain URL from SQLite; restoring to queue")
+                failed_urls.add(item.url)
+
+        # Finalize in-memory state: discard successful dequeues from
+        # pending; restore failed ones back to the heap.
+        async with self._lock:
+            for item in domain_items:
+                self._pending.discard(item.url)
+                if item.url in failed_urls:
+                    heapq.heappush(self._queue, item)
+                    self._pending.add(item.url)
+
+        return [item.url for item in domain_items if item.url not in failed_urls]
 
     def get_stats(self) -> dict[str, Any]:
         """Return frontier operational statistics."""
