@@ -1,53 +1,35 @@
-# Dependencies
-node_modules/
-.pnpm-store/
-
-# Build outputs
-dist/
-.next/
-out/
-build/
-*.tsbuildinfo
-
-# Environment
+__pycache__/
+*.pyc
+*.pyo
 .env
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+venv/
+*.egg-info/
+dist/
+build/
 .DS_Store
-Thumbs.db
+*.csv
+*.json
+!grafana/dashboards/*.json
+frontend/node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/.mypy_cache/
+backend/.venv/
+backend/data/
+server.log
+.coverage
+backend/.coverage
+.commandcode/
 
-# Logs
-*.log
-npm-debug.log*
-pnpm-debug.log*
+# Runtime databases
+backend/app/data/*.db
+backend/data/*.db
+data/*.db
+*.sqlite
+*.sqlite3
 
-# Testing
-coverage/
-
-# Prisma — generated client is rebuilt via `pnpm db:generate`; do not commit it.
-# Schema migrations ARE committed so DB history is tracked.
-packages/db/generated/
-
-# Secrets - never commit
-*.pem
-*.key
-credentials.json
-
-# Turborepo
-.turbo/
-
-# Cache
-.cache/
-.vercel/
-
-# Extension build
-apps/vscode-extension/*.vsix
-.aider*
+# Runtime/test lock artifacts
+backend/tests/*.json.lock
+data/*.json.lock
+backend/app/data/*.lock

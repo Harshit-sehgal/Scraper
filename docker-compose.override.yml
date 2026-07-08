@@ -1,0 +1,22 @@
+# =============================================================================
+# DataForge Scraper — Docker Compose Dev Overrides
+# =============================================================================
+# Automatically merged with docker-compose.yml when running:
+#   docker compose up
+#
+# These overrides are for local development only — not used in production.
+# =============================================================================
+
+services:
+  dataforge:
+    # Extra environment for local debugging + forward host API key
+    environment:
+      - PYTHONDEVMODE=1
+      - DATAFORGE_LOGGING_LEVEL=DEBUG
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    # Show live container logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "1"

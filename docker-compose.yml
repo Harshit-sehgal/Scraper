@@ -1,98 +1,62 @@
+# =============================================================================
+# DataForge Scraper — Docker Compose (Development)
+# =============================================================================
+# Start:  docker compose up -d
+# Logs:   docker compose logs -f
+# Stop:   docker compose down -v
+#
+# Production: see docker-compose.prod.yml
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: waitlayer
-      POSTGRES_USER: waitlayer
-      POSTGRES_PASSWORD: waitlayer-dev
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U waitlayer -d waitlayer"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  api:
+  dataforge:
     build:
       context: .
-      target: api
+      dockerfile: Dockerfile
+      target: dev
+    image: dataforge:latest
+    container_name: dataforge-scraper
     ports:
-      - "4002:4002"
+      - "${HOST:-127.0.0.1}:${PORT:-8000}:8000"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://waitlayer:waitlayer-dev@postgres:5432/waitlayer
-      REDIS_URL: redis://redis:6379
-      # ── WARNING: Dev-only secrets ──
-      # These are visible to anyone who can read this file. Production deploys
-      # MUST override EVERY one of these via a .env file, Docker secrets, or
-      # your secrets manager.
-      # The @waitlayer/config refine() rejects keys containing "change-me" or
-      # "replace-with" — placeholders below are crafted to pass validation
-      # while being trivially distinguishable from real secrets.
-      JWT_SECRET: dev-only-docker-compose-jwt-secret-at-least-32-char
-      JWT_ACCESS_TTL: 15m
-      JWT_REFRESH_TTL: 30d
-      API_PORT: "4002"
-      GOOGLE_CLIENT_ID: "53592884041-8ctl5qb8dm99p9a5e7hf4gthgmgenabl.apps.googleusercontent.com"
-      WEB_BASE_URL: http://localhost:3000
-      # docker-compose is a developer convenience — run with dev NODE_ENV so the
-      # google-token verifier's mock path remains available. Production deploys
-      # must override NODE_ENV=production AND set real secrets.
-      NODE_ENV: development
-      # Enable the mock-google-token path so local dev can sign in without a
-      # real Google account. The verifier requires BOTH NODE_ENV !== 'production'
-      # AND an explicit flag — never set this in staging/production.
-      ALLOW_MOCK_GOOGLE: "true"
-      EMAIL_DRIVER: console
-      EMAIL_FROM: noreply@waitlayer.local
-      STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
-      # Sentry — uncomment to enable error monitoring locally
-      # SENTRY_DSN: https://your-dsn@o123456.ingest.sentry.io/654321
-      # SENTRY_ENVIRONMENT: development
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - DATAFORGE_ENV=development
+    volumes:
+      # Source code mounted for hot-reload
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      # Persistent data across restarts
+      - dataforge_data:/app/backend/data
+    depends_on: []
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4002/api/v1/health"]
-      interval: 10s
+      test: ["CMD", "python", "-c", "import http.client; http.client.HTTPConnection('localhost', 8000).request('GET', '/')"]
+      interval: 15s
       timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  web:
-    build:
-      context: .
-      target: web
-    ports:
-      - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4002/api/v1
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID: "53592884041-8ctl5qb8dm99p9a5e7hf4gthgmgenabl.apps.googleusercontent.com"
-      JWT_SECRET: dev-only-docker-compose-jwt-secret-at-least-32-char
-      # Match the api service — dev convenience compose uses NODE_ENV=development
-      # so the mock-google sign-in button remains available for local testing.
-      NODE_ENV: development
-      NEXT_PUBLIC_ALLOW_MOCK_AUTH: "true"
-    depends_on:
-      api:
-        condition: service_healthy
+      retries: 3
+      start_period: 10s
+    logging: *default-logging
+    # Dev-specific resource limits (relaxed)
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2"
+    networks:
+      - dataforge-net
 
 volumes:
-  pgdata:
-  redisdata:
+  dataforge_data:
+    name: dataforge_scraper_data
+
+networks:
+  dataforge-net:
+    name: dataforge_network
+    driver: bridge
