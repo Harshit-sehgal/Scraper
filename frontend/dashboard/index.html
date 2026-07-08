@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Reliability Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/app/favicon.svg">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #050505; color: #00ff41; font-family: 'Courier New', Courier, monospace; }
+        .card { background-color: #0a0a0a; border: 1px solid #1f2937; border-radius: 0.5rem; padding: 1.5rem; }
+        .metric-value { font-size: 2.5rem; font-weight: bold; color: #00ff41; }
+        .topology-node { cursor: pointer; transition: all 0.3s ease; }
+        .topology-node:hover { stroke: #ffffff; stroke-width: 2px; }
+        
+        @keyframes ripple {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+        .wave-ripple {
+            pointer-events: none;
+            fill: none;
+            stroke: #00ff41;
+            stroke-width: 1.5px;
+            animation: ripple 1.5s ease-out;
+        }
+        .edge-pressure-high { stroke: #ff003c; filter: drop-shadow(0 0 2px #ff003c); }
+        .edge-pressure-med { stroke: #ffbf00; }
+        .edge-pressure-low { stroke: #00ff41; stroke-opacity: 0.4; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #050505; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 2px; }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-12 border-b border-gray-800 pb-6 flex justify-between items-end">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tighter mb-2">SEMANTIC FIELD ENGINE</h1>
+                <p class="text-gray-500 uppercase tracking-widest text-xs">Causally-Governed Distributed Substrate — Status: Online</p>
+            </div>
+            <div id="status-badge" class="px-3 py-1 bg-green-900/30 text-green-400 border border-green-800 rounded-full text-xs font-bold animate-pulse">
+                REAL-TIME STREAMING
+            </div>
+        </header>
+
+        <!-- Legend -->
+        <div class="flex items-center space-x-6 mb-6 text-[10px] text-gray-500 font-bold uppercase tracking-widest bg-gray-900/20 p-2 rounded border border-gray-800/30">
+            <span class="text-gray-400">Pressure Index:</span>
+            <div class="flex items-center"><div class="w-3 h-0.5 bg-[#ff003c] mr-2 shadow-[0_0_3px_#ff003c]"></div> High (Conflict)</div>
+            <div class="flex items-center"><div class="w-3 h-0.5 bg-[#ffbf00] mr-2"></div> Medium (Uncertain)</div>
+            <div class="flex items-center"><div class="w-3 h-0.5 bg-[#00ff41] opacity-40 mr-2"></div> Low (Affinity)</div>
+            <div class="flex items-center ml-auto"><div class="w-3 h-3 border border-[#00ff41] rounded-full mr-2"></div> Semantic Wave</div>
+        </div>
+
+        <!-- Macro Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-8 gap-4 mb-8">
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Health Index</h3>
+                <div id="metric-health" class="metric-value">0.00</div>
+                <div id="health-status" class="text-[10px] text-gray-600 mt-1 uppercase">Syncing...</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Field Pressure</h3>
+                <div id="metric-pressure" class="metric-value">0.000</div>
+                <div class="text-xs text-gray-600 mt-1">Weighted Stress</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Global Energy</h3>
+                <div id="metric-energy" class="metric-value">0.000</div>
+                <div class="text-xs text-gray-600 mt-1">Motion Potential</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Entropy</h3>
+                <div id="metric-entropy" class="metric-value">0.000</div>
+                <div class="text-xs text-gray-600 mt-1">Topological Disorder</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Energy Balance</h3>
+                <div id="metric-energy-balance" class="metric-value">0.0000</div>
+                <div class="text-xs text-gray-600 mt-1">Conservation (0=perfect)</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Regions</h3>
+                <div id="metric-regions" class="metric-value">0</div>
+                <div class="text-xs text-gray-600 mt-1">Active Basins</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Meso Clusters</h3>
+                <div id="metric-meso-count" class="metric-value">0</div>
+                <div class="text-xs text-gray-600 mt-1">Active Assemblies</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Continents</h3>
+                <div id="metric-macro-count" class="metric-value">0</div>
+                <div class="text-xs text-gray-600 mt-1">Macro Governance</div>
+            </div>
+        </div>
+
+        <!-- Scraper Health & Operations (Phase 78) -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Browser Pool</h3>
+                <div id="metric-browser-contexts" class="metric-value">0</div>
+                <div id="metric-browser-reuse" class="text-[10px] text-gray-600 mt-1 uppercase">Reuse Rate: 0%</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Fetch Latency</h3>
+                <div id="metric-latency" class="metric-value">0ms</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Recent Avg (10)</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Success Rate</h3>
+                <div id="metric-success-rate" class="metric-value">100%</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Adaptive Recovery active</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Memory Size</h3>
+                <div id="metric-memory-domains" class="metric-value">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Learned Domains</div>
+            </div>
+        </div>
+
+        <!-- Acquisition Pipeline (Phase 92) -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Session-Bound URLs</h3>
+                <div id="metric-session-bound" class="metric-value">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Ephemeral Params Detected</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Recovery Rate</h3>
+                <div id="metric-recovery-rate" class="metric-value">--%</div>
+                <div id="metric-recovery-detail" class="text-[10px] text-gray-600 mt-1 uppercase">0 / 0 attempts</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Empty 200s</h3>
+                <div id="metric-empty-200" class="metric-value">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Fake-Success Pages</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Total Acquisitions</h3>
+                <div id="metric-total-acquisitions" class="metric-value">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">All Modes</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Acquisition Modes</h3>
+                <div id="metric-acq-modes" class="text-xs text-green-400 font-bold mt-1 leading-relaxed">--</div>
+            </div>
+        </div>
+
+        <!-- Job Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Completed</h3>
+                <div id="metric-jobs-completed" class="metric-value">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Successful Jobs</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Degraded</h3>
+                <div id="metric-jobs-degraded" class="metric-value" style="color:#c7851b;">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Partial Results</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Empty Result</h3>
+                <div id="metric-jobs-empty-result" class="metric-value" style="color:#d24646;">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">No Records Extracted</div>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-500 text-xs font-bold uppercase mb-2">Failed</h3>
+                <div id="metric-jobs-failed" class="metric-value" style="color:#d24646;">0</div>
+                <div class="text-[10px] text-gray-600 mt-1 uppercase">Job Errors</div>
+            </div>
+        </div>
+
+        <!-- Main Visualization Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Topology Map -->
+            <div class="card lg:col-span-2 relative min-h-[500px]">
+                <h3 class="text-gray-400 text-sm font-bold uppercase mb-4 flex justify-between">
+                    <span>Active Topology Heatmap</span>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-gray-600 text-[10px] font-normal uppercase tracking-widest">Topology Timeline Replay</span>
+                        <input type="range" id="timeline-scrubber" min="0" max="0" value="0" aria-label="Topology Timeline Replay" class="w-48 accent-green-500 bg-gray-900 h-1 rounded-lg cursor-pointer">
+                        <button id="live-mode-btn" class="px-2 py-0.5 border border-green-500 text-[8px] rounded text-green-500 font-bold bg-green-500/10">LIVE</button>
+                    </div>
+                </h3>
+                <div id="topology-canvas" class="w-full h-full flex items-center justify-center">
+                    <svg id="field-svg" width="100%" height="450" viewBox="0 0 800 500" class="border border-gray-900/50 bg-[#020202] rounded">
+                        <!-- Content dynamic via JS -->
+                    </svg>
+                </div>
+                <div id="region-details" class="absolute bottom-4 right-4 p-4 bg-black/80 border border-gray-800 rounded text-xs hidden w-64">
+                    <h4 class="font-bold text-green-400 mb-2 border-b border-gray-800 pb-1">REGION INSPECTOR</h4>
+                    <div id="region-info-content"></div>
+                </div>
+            </div>
+
+            <!-- Telemetry Stream -->
+            <div class="card">
+                <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Live Causal Telemetry</h3>
+                <div id="telemetry-log" class="text-[10px] space-y-2 h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+                    <!-- Dynamic logs -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Secondary Charts -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="card">
+                <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Thermodynamic Dissipation</h3>
+                <canvas id="energy-chart" height="150"></canvas>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Semantic Drift (Decay)</h3>
+                <canvas id="drift-chart" height="150"></canvas>
+            </div>
+            <div class="card">
+                <h3 class="text-gray-400 text-sm font-bold uppercase mb-4">Community Density</h3>
+                <canvas id="community-chart" height="150"></canvas>
+            </div>
+        </div>
+
+        <footer class="mt-12 pt-8 border-t border-gray-900 flex justify-between text-[10px] text-gray-700 uppercase tracking-widest">
+            <div>DataForge Substrate v2.0 // Terminal 0xF3-A</div>
+            <div id="last-update">Syncing...</div>
+        </footer>
+    </div>
+
+    <script src="/dashboard/dashboard.js"></script>
+</body>
+</html>

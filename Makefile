@@ -1,48 +1,122 @@
-# WaitLayer Makefile — common developer shortcuts
+# =============================================================================
+# DataForge Scraper — Makefile
+# =============================================================================
+# Common development, test, and deployment commands.
 #
-# Usage: make <target>
-# Most targets defer to pnpm workspace filters.
+# Usage:
+#   make help          Show this help
+#   make build         Build Docker image
+#   make up            Start development stack
+#   make down          Stop development stack
+#   make logs          Tail logs
+#   make shell         Open shell in running container
+#   make test          Run tests inside container
+#   make lint          Run linters inside container
+#   make prod          Start production stack
+#   make clean         Remove containers, volumes, and images
+# =============================================================================
 
-.PHONY: install dev build typecheck lint test db-generate db-migrate \
-        db-studio start-api start-web clean help
+.DEFAULT_GOAL := help
+
+DC := docker compose
+DCF := docker compose -f docker-compose.prod.yml
+SERVICE := dataforge
+
+.PHONY: help build up down logs shell test lint prod clean ps
 
 help: ## Show this help
-	@echo "WaitLayer — available make targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-install: ## Install workspace dependencies
-	pnpm install --frozen-lockfile
+# ─── Build ──────────────────────────────────────────────────────────────────
 
-dev: ## Run all apps in dev mode (API + Web)
-	pnpm run dev
+build: ## Build Docker image (dev target)
+	$(DC) build
 
-build: ## Build all packages
-	pnpm run build
+build-prod: ## Build Docker image (production target)
+	DOCKER_BUILDKIT=1 docker build --target production -t dataforge:latest .
 
-typecheck: ## Typecheck all packages
-	pnpm run typecheck
+# ─── Development ────────────────────────────────────────────────────────────
 
-lint: ## Lint all packages
-	pnpm run lint
+up: ## Start development stack (detached)
+	$(DC) up -d
+	@echo "API:       http://localhost:${PORT:-8000}"
+	@echo "Dashboard: http://localhost:${PORT:-8000}/app"
+	@echo "Docs:      http://localhost:${PORT:-8000}/docs"
 
-test: ## Run all tests (requires DATABASE_URL + REDIS_URL + JWT_SECRET)
-	pnpm run test
+down: ## Stop development stack
+	$(DC) down
 
-db-generate: ## Regenerate the Prisma client
-	pnpm --filter @waitlayer/db generate
+restart: down up ## Restart development stack
 
-db-migrate: ## Apply Prisma migrations (dev)
-	pnpm --filter @waitlayer/db migrate
+logs: ## Tail all logs
+	$(DC) logs -f $(filter-out $@,$(MAKECMDGOALS))
 
-db-studio: ## Open Prisma Studio
-	pnpm --filter @waitlayer/db studio
+ps: ## List containers
+	$(DC) ps
 
-start-api: ## Build + start the API
-	pnpm run start:api
+# ─── Container Interaction ──────────────────────────────────────────────────
 
-start-web: ## Build + start the Web app
-	pnpm run start:web
+shell: ## Open bash in the app container
+	$(DC) exec $(SERVICE) bash
 
-clean: ## Remove build output
-	rm -rf dist apps/*/dist packages/*/dist
+exec: ## Run a command in the app container (usage: make exec CMD="python -c ...")
+	$(DC) exec $(SERVICE) $(CMD)
+
+# ─── Testing ────────────────────────────────────────────────────────────────
+
+test: ## Run all tests (excluding API-dependent)
+	$(DC) exec $(SERVICE) python -m pytest -q --tb=short -k "not test_scrape_url_end_to_end_multiple_records"
+
+test-all: ## Run all tests (including API-dependent, requires GROQ_API_KEY)
+	$(DC) exec $(SERVICE) python -m pytest -q --tb=short
+
+test-file: ## Run tests in a specific file (usage: make test-file FILE=test_foo.py)
+	$(DC) exec $(SERVICE) python -m pytest -q --tb=short backend/tests/$(FILE)
+
+# ─── Linting ────────────────────────────────────────────────────────────────
+
+lint: ## Run all linters
+	$(DC) exec $(SERVICE) python -m pyflakes backend/app backend/tests
+
+mypy: ## Run mypy type checker
+	$(DC) exec $(SERVICE) python -m mypy backend/app --ignore-missing-imports
+
+lint-all: lint mypy ## Run pyflakes + mypy
+
+# ─── Production ─────────────────────────────────────────────────────────────
+
+prod: ## Start production stack
+	$(DCF) up -d
+
+prod-down: ## Stop production stack
+	$(DCF) down
+
+prod-logs: ## Tail production logs
+	$(DCF) logs -f
+
+# ─── Cleanup ────────────────────────────────────────────────────────────────
+
+clean: ## Remove containers, volumes, and dangling images
+	$(DC) down -v --remove-orphans 2>/dev/null || true
+	docker image prune -f 2>/dev/null || true
+	@echo "Cleaned up development resources."
+
+clean-all: clean ## Remove everything including production resources
+	$(DCF) down -v --remove-orphans 2>/dev/null || true
+	docker system prune -af --volumes 2>/dev/null || true
+	@echo "Cleaned up all Docker resources."
+
+# ─── Utility ────────────────────────────────────────────────────────────────
+
+health: ## Check container health
+	@echo "App:"
+	$(DC) ps --filter "status=running" --format "table {{.Names}}\t{{.Status}}"
+	@echo ""
+	@echo "Ports:"
+	@echo "  Development: http://localhost:${PORT:-8000}"
+	@echo "  API Docs:    http://localhost:${PORT:-8000}/docs"
+
+# Allow passing arguments to targets
+%:
+	@:

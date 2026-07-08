@@ -1,93 +1,153 @@
-# WaitLayer
+# DataForge Studio — Web Extraction & Resilient Crawling Platform
 
-Privacy-first reward marketplace for AI wait time and developer attention.
+DataForge Studio is a FastAPI + Playwright web extraction platform that helps users extract structured data from websites using automatic selector discovery, fallback extraction, recovery logic, telemetry, and optional LLM-based schema cleaning.
 
-Developers earn rewards by viewing sponsored content during AI tool wait states (compilation, analysis, code generation). Advertisers bid for attention in a fraud-mitigated, ledger-backed marketplace.
+Unlike basic scrapers, DataForge is built to be resilient, autonomous, and self-healing: it dynamically adapts to page changes, handles failures gracefully with automated recovery pipelines, and maintains a highly efficient, single-row SQLite state store.
 
-## Architecture
+---
 
-This monorepo (pnpm workspaces + Turborepo) contains:
+## ⚡ Quick Start (5-Minute Demo)
 
-| Package | Description |
-|---------|-------------|
-| `apps/api` | NestJS REST API — auth, campaigns, ledger, payouts, fraud detection, extensions |
-| `apps/web` | Next.js frontend — developer, advertiser, and admin dashboards |
-| `apps/cli` | CLI tool — register device, report wait states, check earnings |
-| `apps/vscode-extension` | VS Code extension — detects wait states, displays sponsored ads |
-| `packages/shared` | Shared types, Zod contracts, HMAC signing, constants |
-| `packages/config` | Zod-validated environment schema shared by all apps |
-| `packages/db` | Prisma schema, migrations, and client re-exports |
-| `packages/ui` | Shared UI components |
-| `packages/eslint-config` | Shared ESLint flat config |
+Get up and running locally in just a few steps:
 
-## Quickstart
-
+### 1. Environment Setup
 ```bash
-# Install dependencies
-pnpm install --frozen-lockfile
+# Clone the repository
+git clone https://github.com/Harshit-sehgal/Scraper.git
+cd Scraper
 
-# Generate Prisma client
-pnpm --filter @waitlayer/db generate
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 
-# Start database and Redis-backed local rate limiting
-docker compose up -d postgres redis
-
-# Start API dev server
-pnpm --filter waitlayer-api dev
-
-# Start web dev server (in another terminal)
-pnpm --filter waitlayer-web dev
+# Install dependencies and Playwright browser binaries
+pip install -r backend/requirements.txt
+python -m playwright install chromium
 ```
 
-The API serves interactive **OpenAPI docs at `/api/v1/docs`** (spec:
-`/api/v1/docs-json`) once the API is running.
-
-## Make targets
-
-A `Makefile` wraps common workflows: `make dev`, `make build`, `make typecheck`,
-`make lint`, `make test`, `make db-migrate`, `make db-studio`. Run `make help`.
-
-## Quality Gates
-
+### 2. Configure Environment
+Copy the environment template and configure your keys:
 ```bash
-pnpm run typecheck   # 14/14 tasks
-pnpm run lint        # 9/9 tasks, 0 warnings
-pnpm run build       # 9/9 packages
-pnpm run test        # 326 tests: 302 API + 9 CLI + 11 web + 4 VS Code (API tests require running database)
-pnpm audit --prod    # production dependency vulnerability audit
+cp .env.example .env
+# Edit .env and set your GROQ_API_KEY (optional, fallback engines can run without it)
 ```
 
-## Core Features
+### 3. Start the Server
+Start the development server using our helper script:
+```bash
+./scripts/start.sh
+```
 
-- **Auth**: Email/password signup, Google OAuth, JWT refresh rotation + reuse detection, password reset, TOTP 2FA with encrypted secrets
-- **Campaigns**: Draft → submitted → approved → active lifecycle with budget/bid validation
-- **Ledger**: Three-ledger accounting (earnings, advertiser, platform) with 60/30/10 revenue split
-- **Payouts**: Multi-provider architecture with PayPal Payouts, Stripe Connect, and Wise wired, Razorpay/Payoneer stubs fail-closed in production, hold periods by trust level, optional 2FA gating
-- **Fraud**: Redis-backed rate limits, brute-force lockouts, CTR analysis, self-click detection, trust scoring, automatic earning holds
-- **Extensions**: HMAC-signed event pipeline per device, privacy-enforced, idempotent, with password/Google/support device-secret recovery
-- **Referrals**: Code-based referral system with $5 reward on first payout
-- **Compliance**: Consent ledger, data-retention cron, and admin/user erasure paths that revoke sessions and API keys
-- **API Keys**: Machine-to-machine auth with scoped, expirable keys
+### Production Deployment
+For production, use the Docker stack (see [backend/README_DEPLOYMENT.md](backend/README_DEPLOYMENT.md)):
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
 
-## Documentation
+This includes:
+- **PostgreSQL** for durable storage (or SQLite if not configured)
+- **Worker Queue** for async job processing
+- **Nginx** reverse proxy
+- **Prometheus + Grafana** monitoring stack
 
-- [Strategy Audit](docs/00-strategy-audit.md)
-- [Product Requirements](docs/01-product-requirements.md)
-- [Technical Architecture](docs/02-technical-architecture.md)
-- [Database Schema](docs/03-database-schema.md)
-- [API Specification](docs/04-api-specification.md)
-- [MVP Roadmap](docs/05-mvp-roadmap.md)
-- [Fraud Prevention Plan](docs/06-fraud-prevention-plan.md)
-- [Payout Strategy](docs/07-payout-strategy.md)
-- [Compliance & Privacy](docs/08-compliance-privacy-checklist.md)
-- [UI Page List](docs/09-ui-page-list.md)
-- [Engineering Breakdown](docs/10-engineering-task-breakdown.md)
-- [Milestone Checklist](docs/11-milestone-checklist.md)
-- [Definition of Done](docs/12-definition-of-done.md)
-- [Risk Register](docs/13-risk-register.md)
-- [Validation Experiments](docs/14-validation-experiments.md)
-- [Sources & Assumptions](docs/15-sources-and-assumptions.md)
-- [Architecture Overview](docs/16-architecture-overview.md)
-- [API Changelog](docs/17-api-changelog.md)
-- [Architecture Decision Records](docs/adr/0001-record-architecture-decisions.md)
-- [Foundation Status](FOUNDATION_STATUS.md)
+Set `DATAFORGE_DATABASE_URL` to switch to Postgres, and `DATAFORGE_WORKER_QUEUE=true` to enable the async worker queue.
+
+**Queue Backend**: Set `DATAFORGE_QUEUE_BACKEND=postgres` to use Postgres-backed queue (recommended for multi-node production). Defaults to SQLite for single-node deployments.
+
+### 4. Create and Scrape a Job
+Open another terminal (with `.venv` activated) and run the manual test interface to quickly launch a demonstration extraction job:
+```bash
+python scripts/manual_test.py test-job
+```
+This will register and execute a live extraction job, showing real-time logs and progress on your terminal!
+
+---
+
+## 🖥️ Interactive Dashboards
+
+Once the platform is running, access the user interfaces:
+
+| Interface | URL | Purpose |
+|-----|-------------|---------|
+| **DataForge Studio Dashboard** | `http://localhost:8000/app` | Visually manage, monitor, and run extraction jobs. |
+| **Semantic Reliability Dashboard** | `http://localhost:8000/dashboard` | View real-time crawler telemetry, selector drift metrics, and graph topology. |
+| **Interactive API Swagger Docs** | `http://localhost:8000/docs` | Standard FastAPI OpenAPI sandbox for developers. |
+
+---
+
+## 🛠️ Manual Testing CLI
+
+The project includes an interactive, rich CLI test tool for verification:
+
+### Interactive Menu
+```bash
+python scripts/manual_test.py
+```
+This opens a terminal menu with quick options to:
+- Check server health, live jobs, and configuration limits
+- Explore the semantic field topology (regions, edges, clusters)
+- View real-time observability telemetry and health index
+- Create and monitor a real scraping job (manual or auto/discovery mode)
+- Browse synthesized crystalline knowledge records
+- Run the full pytest suite
+
+### Quick Command Line Actions
+```bash
+# Quick health check
+python scripts/manual_test.py health
+
+# Show field topology and metrics
+python scripts/manual_test.py topology
+
+# Create a test job (manual mode) and monitor progress
+python scripts/manual_test.py test-job
+
+# Create a test job (auto/discovery mode)
+python scripts/manual_test.py test-job-auto
+
+# View observability & health index
+python scripts/manual_test.py observability
+
+# Run all checks sequentially
+python scripts/manual_test.py all
+
+# Run the full test suite
+python scripts/manual_test.py tests
+```
+
+---
+
+## ⚙️ REST API Endpoints
+
+DataForge Studio exposes a rich, RESTful API interface for programmatic jobs and system diagnostics:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Production-grade lightweight health check endpoint. |
+| GET | `/api/system/status` | Server status, job counts, and runtime config. |
+| GET | `/api/system/topology` | Full semantic field state (regions, edges, clusters). |
+| GET | `/api/system/observability` | Telemetry, health index, and drift heatmaps. |
+| GET | `/api/system/crystalline` | Synthesized knowledge records. |
+| GET | `/api/system/export/knowledge`| Export knowledge manifold. |
+| POST | `/api/jobs` | Create a new scraping / extraction job. |
+| GET | `/api/jobs/{id}` | Get status and results for a job. |
+| DELETE | `/api/jobs/{id}` | Delete a job (moves it to the recycle bin). |
+| GET | `/api/recycle_bin` | List deleted jobs. |
+| POST | `/api/recycle_bin/{id}/restore`| Restore a deleted job. |
+| DELETE | `/api/recycle_bin/{id}` | Permanently delete a job. |
+| POST | `/api/system/scheduler/step` | Trigger cognitive scheduler manually. |
+| GET | `/api/system/search?query=...`| Topological search. |
+| GET | `/metrics` | Prometheus metrics endpoint. In production it is blocked by public Nginx and scraped internally by Prometheus over the Docker network. |
+
+---
+
+## 🧠 Cognitive Substrate & Research Layer (Advanced)
+
+For developers and researchers interested in the under-the-hood intelligence layer, DataForge Studio uses a **topology-native dynamical system** to align extracted meaning. This is detailed in our custom `GEMINI.md` ontology:
+
+1. **Unified Semantic World State**: A canonical substrate in `app/semantic_world_state/` that serves as the single source of truth for all cognition engines.
+2. **Meaning from Topology**: Meaning emerges from relational graph energy and stability, not simple regex matching.
+3. **Contradiction-Aware Reasoning**: Semantic conflicts propagate as energy pressure through the graph via `ExclusionEdge` topology.
+4. **Adaptive Memory**: Structural motifs are reinforced by extraction successes and decayed by time/neglect to counter element change (selector decay).
+
+For deep structural details and research notes, see [ARCHITECTURE.md](backend/ARCHITECTURE.md) and [RESEARCH_NOTES.md](backend/RESEARCH_NOTES.md).

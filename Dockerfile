@@ -1,73 +1,95 @@
-# ── Base Stage: pnpm + dependencies ──
-FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@11 --activate
+# =============================================================================
+# DataForge Scraper — Dockerfile
+# =============================================================================
+# Multi-stage build with dev/prod targets.
+#
+# Build:         docker build -t dataforge:latest .
+# Dev:           docker compose up
+# Production:    docker compose -f docker-compose.prod.yml up -d
+# =============================================================================
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 0: Base — shared system dependencies
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS base
+
 WORKDIR /app
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
-COPY packages/db/package.json packages/db/
-COPY packages/shared/package.json packages/shared/
-COPY packages/eslint-config/package.json packages/eslint-config/
-COPY packages/config/package.json packages/config/
-COPY packages/ui/package.json packages/ui/
-COPY apps/api/package.json apps/api/
-COPY apps/web/package.json apps/web/
-COPY apps/cli/package.json apps/cli/
-COPY apps/vscode-extension/package.json apps/vscode-extension/
+# Environment defaults (overridable at runtime)
+ENV PYTHONPATH=/app/backend \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-RUN pnpm install --frozen-lockfile
+# Runtime system libraries for Playwright/Chromium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+    libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 \
+    libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# ── Build Stage: turbo build all packages ──
-FROM base AS build
-COPY . .
-RUN pnpm --filter @waitlayer/db run generate
-RUN pnpm run build
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1: Python dependencies (cached separately from app code)
+# ─────────────────────────────────────────────────────────────────────────────
+FROM base AS deps
 
-# ── API Runtime ──
-FROM node:22-alpine AS api
-RUN apk add --no-cache wget
-WORKDIR /app
+COPY backend/requirements.txt .
 
-# Copy pruned production node_modules
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages ./packages
+# Install production dependencies only
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy API build output
-COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2: Development (hot-reload, debug-friendly)
+# ─────────────────────────────────────────────────────────────────────────────
+FROM deps AS dev
 
-# Workspace metadata
-COPY --from=build /app/pnpm-workspace.yaml ./
-COPY --from=build /app/package.json ./
+# Install dev dependencies
+RUN pip install --no-cache-dir pytest pytest-cov pytest-asyncio mypy pyflakes autoflake
 
-ENV NODE_ENV=production
-EXPOSE 4002
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:4002/api/v1/health || exit 1
-CMD ["sh", "-c", "packages/db/node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma && node apps/api/dist/apps/api/src/main.js"]
+# Install Playwright browsers (deferred to runtime in dev for faster image builds)
+RUN playwright install chromium 2>&1 | tail -5
 
-# ── Web Runtime ──
-FROM node:22-alpine AS web
-RUN apk add --no-cache wget
-WORKDIR /app/apps/web
+# Copy application code (thin layer — source changes don't invalidate deps)
+COPY backend/ backend/
+COPY frontend/ frontend/
+COPY scripts/ scripts/
 
-# Copy pruned production node_modules (monorepo root)
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/packages /app/packages
+# Health check
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import http.client; http.client.HTTPConnection('localhost', 8000).request('GET', '/');" || exit 1
 
-# Copy web build output
-COPY --from=build /app/apps/web/.next ./.next
-COPY --from=build /app/apps/web/node_modules ./node_modules
-COPY --from=build /app/apps/web/public ./public
-COPY --from=build /app/apps/web/next.config.* ./
-COPY --from=build /app/apps/web/package.json ./package.json
+EXPOSE 8000
 
-# Workspace metadata
-COPY --from=build /app/pnpm-workspace.yaml /app/pnpm-workspace.yaml
-COPY --from=build /app/package.json /app/package.json
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
 
-ENV NODE_ENV=production
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
-CMD ["node", "node_modules/next/dist/bin/next", "start"]
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 3: Production (minimal, secure)
+# ─────────────────────────────────────────────────────────────────────────────
+FROM deps AS production
+
+# Create non-root user
+RUN groupadd -r dataforge && useradd -r -g dataforge -d /app -s /usr/sbin/nologin dataforge
+
+# Install Playwright browsers (only chromium, minimal deps)
+RUN mkdir -p /ms-playwright && playwright install chromium 2>&1 | tail -3 && chown -R dataforge:dataforge /ms-playwright
+
+# Copy application code
+COPY backend/ backend/
+COPY frontend/ frontend/
+COPY scripts/ scripts/
+
+# Security: drop root privileges
+RUN chown -R dataforge:dataforge /app
+USER dataforge
+
+# Health check — uses /ready (proves storage reachability, not just process alive)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD python -c "import http.client; c=http.client.HTTPConnection('localhost', 8000); c.request('GET', '/ready'); r=c.getresponse(); exit(0 if r.status==200 else 1)" || exit 1
+
+EXPOSE 8000
+
+# Production: no --reload, info-level logs
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
