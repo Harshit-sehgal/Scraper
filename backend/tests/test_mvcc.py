@@ -27,8 +27,12 @@ def test_mvcc_conflict_detection(ws) -> None:
 
     results = []
     # B signals this event when it has committed, so A knows it's safe
-    # to attempt its own (now-conflicting) modification.
+    # to attempt its own (now-conflicting) modification. A signals when
+    # it has read the region, so B only commits after that read — without
+    # this ordering the test races: if B commits before A's read, the
+    # write is not a conflict and the test spuriously fails.
     b_committed = threading.Event()
+    a_read = threading.Event()
 
     def run_tx_A() -> None:
         try:
@@ -37,7 +41,9 @@ def test_mvcc_conflict_detection(ws) -> None:
                 view = ws.get_topology_view()
                 _ = view.all_regions()
 
-                # 3. Wait for B to commit — no wall-clock dependency
+                # 3. Tell B the read happened, then wait for B to commit —
+                # no wall-clock dependency
+                a_read.set()
                 b_committed.wait(timeout=5.0)
 
                 # 4. Transaction A tries to modify the region
@@ -51,6 +57,9 @@ def test_mvcc_conflict_detection(ws) -> None:
 
     def run_tx_B() -> None:
         try:
+            # Only write after A's read, so the write is guaranteed to
+            # conflict with A's in-flight transaction.
+            a_read.wait(timeout=5.0)
             with ws.transaction("tx_B"):
                 # 3. Transaction B modifies AND COMMITS the region
                 ws._topology.set_region_instability(region_id, 0.8)
