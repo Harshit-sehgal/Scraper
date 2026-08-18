@@ -62,7 +62,6 @@ def test_well_known_research_modules_are_classified() -> None:
         "semantic_world_state",
         "semantic_segmentation",
         "topology_state",
-        "topology_api",
         "chaos_simulator",
         "chaos_scenarios",
         "field_laws",

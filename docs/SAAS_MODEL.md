@@ -1,9 +1,9 @@
 # DataForge Scraper — SaaS Model
 
-Date: 2026-06-13
+Date: 2026-06-13 (refreshed 2026-08-18 per `docs/EXECUTION_PLAN.md` E0.2)
 Commit: `7d47045`
 
-This document describes the SaaS identity and multi-tenancy model implemented in the current checkout. For the implementation source, see `backend/app/saas/`.
+This document describes the SaaS identity and multi-tenancy model implemented in the current checkout. For the implementation source, see `backend/app/saas/`. Billing specifics live in `backend/app/billing/`; the money-loop plan lives in `docs/EXECUTION_PLAN.md` Phase 2.
 
 ---
 
@@ -121,14 +121,34 @@ Access checks use the centralized `can_access_scoped_resource()` helper in `app.
 
 ---
 
-## 9. What Is Not Yet Implemented
+## 9. What Is Built vs What Is Still Unproven
 
-- Payment provider integration (PayPal — Subscriptions API)
-- Plan enforcement in middleware/routes
-- Email verification on signup
-- Password reset flow
-- Team invitation by email
-- Project deletion cascade
-- Organization deletion cascade
-- Postgres parity for identity store
-- Frontend account/workspace management pages
+Correction 2026-08-18 (E0.2): this section previously listed PayPal
+integration and plan enforcement as "not yet implemented". That is
+stale. The current checkout contains:
+
+- **Billing module**: `backend/app/billing/` — `checkout.py`, `webhooks.py`,
+  `service.py`, `models.py` (PayPal migration flow).
+- **Quota/plan enforcement**: `_enforce_api_auth_and_quota` in
+  `backend/app/middlewares.py` plus `backend/app/plan_enforcer.py`
+  (`_PLAN_LIMITS`), wired into job creation and export paths.
+- **Durable metering**: `backend/app/utils/usage_ledger.py` persists
+  quota + events to SQLite; persistence fixed 2026-08-18 (Session 97 —
+  quotas previously vanished on restart).
+
+**Still unproven (not implemented or not end-to-end verified):**
+
+- PayPal sandbox end-to-end: signup → checkout → webhook → entitlement
+  flip → limit → upgrade → resume. This is `docs/EXECUTION_PLAN.md`
+  task E2.3.
+- Plan hard-stop (403 on job creation at tier limit) verified
+  end-to-end against a deployed environment (E2.1).
+- Usage metering confirmed against the PRD §4 pricing metric (page
+  fetches/month) with no double counting (E2.2).
+- Email verification on signup (partial frontend exists; flow not
+  proven end-to-end).
+- Password reset flow.
+- Postgres parity for the identity store.
+- Frontend account/workspace management pages.
+- AUP enforcement at protected-action time (acceptance tracking exists;
+  enforcement point remains future).

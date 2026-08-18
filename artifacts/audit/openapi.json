@@ -701,6 +701,50 @@
         "title": "DiscoveryRequest",
         "type": "object"
       },
+      "DodoCheckoutRequest": {
+        "description": "Request body for POST /api/billing/dodo/checkout.",
+        "properties": {
+          "email": {
+            "default": "",
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Name",
+            "type": "string"
+          },
+          "plan_tier": {
+            "enum": [
+              "starter",
+              "pro",
+              "enterprise"
+            ],
+            "title": "Plan Tier",
+            "type": "string"
+          },
+          "return_url": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url"
+          }
+        },
+        "required": [
+          "plan_tier"
+        ],
+        "title": "DodoCheckoutRequest",
+        "type": "object"
+      },
       "DomainConfidenceResponse": {
         "description": "Response model for GET /api/scraper/selectors/domain/{domain}.",
         "properties": {
@@ -4424,6 +4468,78 @@
           }
         },
         "summary": "Create Checkout",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/billing/dodo/checkout": {
+      "post": {
+        "description": "Create a Dodo checkout session for a plan tier.\n\nReturns ``{\"checkout_url\": ..., \"session_id\": ..., \"plan_tier\": ...}``.\nThe user is redirected to ``checkout_url`` (hosted by Dodo).",
+        "operationId": "dodo_checkout_api_billing_dodo_checkout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DodoCheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Dodo Checkout Api Billing Dodo Checkout Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dodo Checkout",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/billing/dodo/webhook": {
+      "post": {
+        "description": "Receive billing webhook events from Dodo Payments.\n\nThe request is verified with the Standard-Webhooks HMAC signature\n(headers ``webhook-id`` / ``webhook-timestamp`` / ``webhook-signature``)\nand deduplicated by ``webhook-id``.",
+        "operationId": "dodo_webhook_api_billing_dodo_webhook_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Dodo Webhook Api Billing Dodo Webhook Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dodo Webhook",
         "tags": [
           "billing"
         ]
@@ -10805,6 +10921,49 @@
         "summary": "Health Worker",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/legal/{page}": {
+      "get": {
+        "description": "Serve a legal page (ToS, Privacy Policy, or AUP) as HTML.",
+        "operationId": "get_legal_page_legal__page__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page",
+            "required": true,
+            "schema": {
+              "title": "Page",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Legal Page",
+        "tags": [
+          "legal"
         ]
       }
     },

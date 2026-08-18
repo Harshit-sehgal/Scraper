@@ -1,7 +1,7 @@
-"""Tests for all 14 extracted modules — verify they work independently."""
+"""Tests for the 10 kept extracted modules — verify they work independently."""
 
 from app.semantic_persistence import clear_semantic_state
-from app.semantic_world_state import FieldConflictRegion, get_world_state
+from app.semantic_world_state import get_world_state
 
 
 def test_topology_state() -> None:
@@ -45,43 +45,6 @@ def test_instability_state() -> None:
     assert ist.exclusion_count() == 1
     ist.decay(rate=0.5)
     assert ist.get_exclusion("origin", "destination") < 0.5
-
-
-def test_topology_api() -> None:
-    ws = get_world_state()
-    """TopologyAPI: read/write separation."""
-    from app.topology_api import TopologyAPI
-
-    clear_semantic_state(clear_file=False)
-    api = TopologyAPI(ws)
-    r_original = api.add_region(["origin", "destination"], "TEST", instability=0.5, integrity=0.5)
-    rid = r_original.region_id
-    # Re-fetch from API to get the "live" version (it might have been cloned by MVCC)
-    r = ws.topology_state.get_region(rid)
-    assert api.region_count() == 1
-    assert api.find_region("TEST", {"origin", "destination"}) is not None
-    assert api.prune_weak_regions(min_instability=0.6) == 0
-
-    # Update properties on the live version
-    r.instability = 0.01
-    r.semantic_pressure = 0.0  # Force low energy for pruning test
-    r.local_energy = 0.1
-    assert api.prune_weak_regions(min_instability=0.02) == 1
-
-    assert api.region_count() == 0
-
-
-def test_energy_api() -> None:
-    ws = get_world_state()
-    """EnergyAPI: controlled energy mutations with NaN rejection."""
-    from app.energy_api import EnergyAPI
-
-    clear_semantic_state(clear_file=False)
-    api = EnergyAPI(ws)
-    api.set_global_energy(5.0)
-    assert api.get_global_energy() == 5.0
-    api.set_global_energy(float("nan"))
-    assert api.get_global_energy() == 5.0  # unchanged
 
 
 def test_instability_api() -> None:
@@ -146,19 +109,6 @@ def test_field_laws() -> None:
     assert MAX_COUPLING_TRANSFER == 0.3
 
 
-def test_persistence() -> None:
-    ws = get_world_state()
-    """persistence_state: serialize/deserialize round-trip."""
-    from app.persistence_state import clear_world_state, world_state_to_dict
-
-    clear_semantic_state(clear_file=False)
-    ws.total_co_occurrences = 0  # HEAD needs this
-    d = world_state_to_dict(ws)
-    assert "version" in d
-    assert "global_energy" in d
-    clear_world_state(ws)
-
-
 def test_core_types() -> None:
     """core_types: FieldConflictRegion."""
     from app.core_types import FieldConflictRegion
@@ -170,17 +120,6 @@ def test_core_types() -> None:
     es = EnergyState()
     assert 0.0 <= es.field_pressure <= 1.0
     assert 0.0 <= es.integrity_score <= 1.0
-
-
-def test_topology_gc() -> None:
-    ws = get_world_state()
-    """topology_gc: collect_garbage returns counts."""
-    from app.topology_gc import collect_garbage
-
-    clear_semantic_state(clear_file=False)
-    ws._topology.append_region(FieldConflictRegion(competing_roles=["a", "b"], token="DEAD", instability=0.01, local_energy=0.1))
-    collected = collect_garbage(ws)
-    assert collected["regions"] >= 0
 
 
 def test_invariant_firewall() -> None:

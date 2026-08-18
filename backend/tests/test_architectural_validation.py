@@ -521,7 +521,7 @@ class TestIntegrationPoints:
 
     def test_isolated_module_independence(self) -> None:
         """Isolated modules should have minimal dependencies."""
-        isolated = ["selector_ml_optimizer", "trend_analyzer", "transactional_priority_queue"]
+        isolated = ["selector_ml_optimizer", "trend_analyzer"]
 
         for mod in isolated:
             if mod in self.validator.imports_map:

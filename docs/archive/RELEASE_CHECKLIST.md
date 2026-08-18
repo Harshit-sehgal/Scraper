@@ -32,7 +32,7 @@ Use this checklist before every production release.
 
 - [ ] Migration scripts tested on staging
 - [ ] Rollback script tested on staging
-- [ ] Schema version documented in `docs/STATE_MODEL.md`
+- [ ] Schema version documented in `docs/archive/STATE_MODEL.md`
 
 ## Deployment Steps
 

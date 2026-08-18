@@ -35,4 +35,4 @@ Configured via `app.utils.data_retention.get_retention_config()`:
 2. Confirm the background retention sweep interval (`DATAFORGE_RETENTION_INTERVAL`) is appropriate for your retention windows.
 3. Document customer-facing retention in your SaaS terms.
 
-See also: `docs/SAFETY_AND_ACCEPTABLE_USE.md`, `artifacts/audit/COMPLIANCE_BASELINE.md`.
+See also: `docs/archive/SAFETY_AND_ACCEPTABLE_USE.md`, `artifacts/audit/COMPLIANCE_BASELINE.md`.

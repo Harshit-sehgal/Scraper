@@ -142,4 +142,4 @@ Current backend preview flow:
 5. Backend preview executes those steps against the snapshot and returns
    sample rows, timeline, warnings, or friendly failure details.
 
-See `docs/WORKFLOW_REPLAY.md` for endpoint details and current gaps.
+See `docs/archive/WORKFLOW_REPLAY.md` for endpoint details and current gaps.

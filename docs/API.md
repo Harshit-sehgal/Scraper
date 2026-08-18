@@ -17,6 +17,7 @@ This route list was generated from the FastAPI app during the audit. Production 
 | GET | `/app` | Static main dashboard |
 | GET | `/dashboard` | Static semantic dashboard |
 | GET | `/landing` | Static landing page preview |
+| GET | `/legal/{page}` | Public legal pages (`terms`, `privacy`, `aup`) |
 
 ## Job and Result Routes
 
@@ -232,6 +233,8 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | --- | --- | --- |
 | POST | `/api/billing/checkout` | Operator or admin |
 | POST | `/api/billing/webhook` | Billing webhook secret or HMAC signature |
+| POST | `/api/billing/dodo/checkout` | Authenticated user (USER role) |
+| POST | `/api/billing/dodo/webhook` | Standard-Webhooks signature (Dodo) |
 | GET | `/api/billing/stub-return/{plan_tier}/{request_id}` | Unauthenticated (dev-only stub) |
 | GET | `/api/billing/subscriptions` | Operator or admin |
 | GET | `/api/billing/subscriptions/{customer_id}` | Operator or admin |

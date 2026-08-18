@@ -690,7 +690,7 @@
 
 .pricing-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
 }
 
@@ -965,6 +965,78 @@
   transition-delay: 0.15s;
 }
 
+/* ─── Self-service signup ─── */
+
+.signup {
+  padding: var(--space-12) var(--space-6);
+  background: var(--surface-2);
+}
+
+.signup-inner {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.signup h2 {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--ink-1);
+  letter-spacing: -0.025em;
+  margin-bottom: var(--space-2);
+}
+
+.signup-sub {
+  text-align: center;
+  font-size: var(--text-md);
+  color: var(--ink-3);
+  margin-bottom: var(--space-8);
+}
+
+.signup-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.signup-field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.signup-field input {
+  font: inherit;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--ink-1);
+}
+
+.signup-field input:focus {
+  outline: 2px solid var(--ink-1);
+  outline-offset: 1px;
+}
+
+.signup-error {
+  color: var(--danger, #b3261e);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.signup-legal {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  margin: var(--space-2) 0 0;
+}
+
+.signup-legal a {
+  color: var(--ink-2);
+  text-decoration: underline;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal {
     opacity: 1;
@@ -1030,6 +1102,7 @@
   .features,
   .use-cases,
   .pricing,
+  .signup,
   .faq {
     padding: var(--space-9) var(--space-4);
   }

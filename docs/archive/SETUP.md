@@ -41,7 +41,7 @@ For local development, SQLite-style state is enough. Use `DATAFORGE_STATE_FILE_P
 
 By default the process runs as a standalone node (API + worker + scheduler in one).
 Set `DATAFORGE_NODE_ROLE` to `api`, `worker`, or `scheduler` to split responsibilities
-across multiple containers. See `docs/HA_DEPLOYMENT.md` for multi-node deployment.
+across multiple containers. See `docs/archive/HA_DEPLOYMENT.md` for multi-node deployment.
 
 ## Optional API Keys
 

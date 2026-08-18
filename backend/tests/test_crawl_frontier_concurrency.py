@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
-import time
 
 import pytest
 from app.crawl_frontier import CrawlFrontier
@@ -61,18 +60,12 @@ async def test_frontier_concurrency_performance() -> None:
     num_urls = 50
     urls = [f"https://example.com/page{i}" for i in range(num_urls)]
 
-    # Measure time to add 50 URLs concurrently
-    start_time = time.perf_counter()
     await asyncio.gather(*(frontier.add_url(url) for url in urls))
-    _duration = time.perf_counter() - start_time
 
     assert len(frontier._pending) == num_urls
     assert len(frontier._queue) == num_urls
 
-    # Now concurrently mark them all completed
-    start_time = time.perf_counter()
     await asyncio.gather(*(frontier.mark_completed(url) for url in urls))
-    _duration_complete = time.perf_counter() - start_time
 
     assert len(frontier._completed) == num_urls
     assert len(frontier._pending) == 0

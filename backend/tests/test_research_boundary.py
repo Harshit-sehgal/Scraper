@@ -26,9 +26,7 @@ from app.research import (
 
 RESEARCH_SPOT_CHECKS = (
     "semantic_world_state",
-    "semantic_os",
     "topology_state",
-    "topology_api",
     "manifold_state",
     "motif_state",
     "energy_state",
@@ -120,8 +118,8 @@ def test_is_research_module_handles_empty_and_junk_input() -> None:
 
 
 def test_is_research_path_strips_known_package_prefixes() -> None:
-    assert is_research_path("app.semantic_os") is True
-    assert is_research_path("backend.app.semantic_os") is True
+    assert is_research_path("app.topology_state") is True
+    assert is_research_path("backend.app.topology_state") is True
     assert is_research_path("app.scraper") is False
     assert is_research_path("backend.app.scraper") is False
 

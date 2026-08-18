@@ -555,3 +555,138 @@ class TestCanonicalFiveStrategyContract:
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             WorkflowPaginationConfig(strategy=self.LEGACY_STRATEGY)
         assert exc_info.value is not None
+
+
+class TestPaginationOnPageFetchHook:
+    """Metering hook: fires once per *additional* page fetched (page 1 is the
+    caller's base fetch); returning False stops pagination with
+    ``stopped_reason == "quota_exceeded"``."""
+
+    pytestmark = pytest.mark.asyncio
+
+    async def test_url_pattern_hook_called_for_additional_pages_only(self):
+        """The hook receives page 2..N URLs, never the base page 1 URL."""
+        page = _make_mock_page()
+        fetched: list[str] = []
+
+        def _record(url: str) -> bool:
+            fetched.append(url)
+            return True
+
+        config = PaginationConfig(
+            strategy="url_pattern",
+            max_pages=3,
+            url_pattern="https://example.com?page={page}",
+            delay_between_pages=0,
+            stop_on_duplicates=False,
+            on_page_fetch=_record,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert fetched == ["https://example.com?page=2", "https://example.com?page=3"], (
+            f"hook must fire per additional page; got {fetched!r}"
+        )
+        assert result.pages_scraped == 3
+        assert result.stopped_reason == "max_pages"
+
+    async def test_url_pattern_hook_false_stops_with_quota_exceeded(self):
+        """Returning False from the hook stops pagination immediately."""
+        page = _make_mock_page()
+        calls: list[str] = []
+
+        def _hook(url: str) -> bool:
+            calls.append(url)
+            return url != "https://example.com?page=3"
+
+        config = PaginationConfig(
+            strategy="url_pattern",
+            max_pages=4,
+            url_pattern="https://example.com?page={page}",
+            delay_between_pages=0,
+            stop_on_duplicates=False,
+            on_page_fetch=_hook,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert result.stopped_reason == "quota_exceeded", (
+            f"hook False must stop with 'quota_exceeded'; got {result.stopped_reason!r}"
+        )
+        assert result.pages_scraped == 2, "pages 1-2 fetched, page 3 blocked"
+        assert calls == ["https://example.com?page=2", "https://example.com?page=3"], (
+            f"hook must be consulted for every additional page; got {calls!r}"
+        )
+
+    async def test_page_number_hook_fires_after_each_click(self):
+        """page_number strategy fires the hook with the current page URL."""
+        page = _make_mock_page(locator_visible=True)
+        page.locator.return_value.count = AsyncMock(return_value=1)
+        fetched: list[str] = []
+
+        def _record(url: str) -> bool:
+            fetched.append(url)
+            return True
+
+        config = PaginationConfig(
+            strategy="page_number",
+            max_pages=2,
+            delay_between_pages=0,
+            stop_on_duplicates=False,
+            on_page_fetch=_record,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert fetched == ["https://example.com"], f"one click = one additional fetch; got {fetched!r}"
+        assert result.pages_scraped == 2
+        assert result.stopped_reason == "max_pages"
+
+    async def test_page_number_hook_false_stops_with_quota_exceeded(self):
+        """page_number strategy honors a False hook return."""
+        page = _make_mock_page(locator_visible=True)
+        page.locator.return_value.count = AsyncMock(return_value=1)
+
+        config = PaginationConfig(
+            strategy="page_number",
+            max_pages=3,
+            delay_between_pages=0,
+            stop_on_duplicates=False,
+            on_page_fetch=lambda _url: False,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert result.stopped_reason == "quota_exceeded", f"page_number must stop on hook False; got {result.stopped_reason!r}"
+        assert result.pages_scraped == 1, "page 1 extracted, first click blocked"
+
+    async def test_next_button_hook_fires_after_each_click(self):
+        """next_button strategy fires the hook after every successful click."""
+        page = _make_mock_page(locator_visible=True)
+        fetched: list[str] = []
+
+        def _record(url: str) -> bool:
+            fetched.append(url)
+            return True
+
+        config = PaginationConfig(
+            strategy="next_button",
+            max_pages=2,
+            delay_between_pages=0,
+            stop_on_duplicates=False,
+            on_page_fetch=_record,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert fetched == ["https://example.com", "https://example.com"], f"every click is an additional fetch; got {fetched!r}"
+        assert result.pages_scraped == 2
+        assert result.stopped_reason == "max_pages"
+
+    async def test_next_button_hook_false_stops_with_quota_exceeded(self):
+        """next_button strategy honors a False hook return."""
+        page = _make_mock_page(locator_visible=True)
+
+        config = PaginationConfig(
+            strategy="next_button",
+            max_pages=5,
+            delay_between_pages=0,
+            stop_on_duplicates=False,
+            on_page_fetch=lambda _url: False,
+        )
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        assert result.stopped_reason == "quota_exceeded", f"next_button must stop on hook False; got {result.stopped_reason!r}"
+        # The base page is extracted but not yet counted (pages_scraped
+        # increments only after a successful click) — so a blocked first
+        # click leaves pages_scraped == 0.
+        assert result.pages_scraped == 0, "first click blocked before count increment"

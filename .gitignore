@@ -98,12 +98,15 @@ SESSION_FINAL_STATS.txt
 *_EVIDENCE*.md
 *_EVIDENCE_REPORT*.md
 *_GUIDE*.md
+!docs/product/*_GUIDE*.md
 *_AUDIT*.md
 *_COMPLETION*.md
 *_REVIEW.md
 *_TRIAGE.md
+!docs/RESEARCH_TRIAGE.md
 *_BACKLOG.md
 *_PLAN.md
+!docs/archive/DOMAIN_PLAN.md
 *_FIX_REPORT.md
 DEEP_SCAN_*.md
 REMAINING_WORK_*.md

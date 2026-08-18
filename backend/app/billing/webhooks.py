@@ -464,22 +464,32 @@ resolve_plan_tier = resolve_tier_from_plan_id
 
 
 # Module-level event-type dispatch sets (immutable, one allocation).
+# Dodo Payments event types (see ``app.billing.dodo.normalize_dodo_webhook``)
+# are normalized into these dialects before ``_process_webhook_event`` is
+# called, except the on_hold/failed/cancelled/payment variants which are
+# dispatched here directly.
 _PAYPAL_SUBSCRIPTION_EVENTS: frozenset[str] = frozenset(
     {
         "BILLING.SUBSCRIPTION.CREATED",
         "BILLING.SUBSCRIPTION.UPDATED",
         "BILLING.SUBSCRIPTION.ACTIVATED",
+        "subscription.active",
+        "subscription.renewed",
+        "subscription.reactivated",
     }
 )
 _PAYPAL_SUSPENDED_EVENTS: frozenset[str] = frozenset(
     {
         "BILLING.SUBSCRIPTION.SUSPENDED",
+        "subscription.on_hold",
+        "subscription.failed",
     }
 )
 _PAYPAL_CANCELLED_EVENTS: frozenset[str] = frozenset(
     {
         "BILLING.SUBSCRIPTION.CANCELLED",
         "BILLING.SUBSCRIPTION.EXPIRED",
+        "subscription.cancelled",
     }
 )
 _PAYPAL_PAYMENT_FAILED_EVENTS: frozenset[str] = frozenset(
@@ -487,12 +497,14 @@ _PAYPAL_PAYMENT_FAILED_EVENTS: frozenset[str] = frozenset(
         "PAYMENT.SALE.DENIED",
         "PAYMENT.SALE.FAILED",
         "BILLING.SUBSCRIPTION.PAYMENT.FAILED",
+        "payment.failed",
     }
 )
 _PAYPAL_PAYMENT_COMPLETED_EVENTS: frozenset[str] = frozenset(
     {
         "PAYMENT.SALE.COMPLETED",
         "PAYMENT.SALE.PENDING",
+        "payment.succeeded",
     }
 )
 

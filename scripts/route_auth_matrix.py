@@ -98,6 +98,9 @@ def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str,
     if "operator" in roles:
         return ("operator", "require_role([operator])", "")
 
+    if roles == ["user"]:
+        return ("authenticated-user", "require_role([user])", "")
+
     # Endpoints explicitly exempt from API-key middleware (browsers or
     # self-service auth cannot carry API keys).
     if path == "/api/system/csp-violations":

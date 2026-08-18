@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved `CURRENT_AUP_VERSION` from `app.saas/router.py` to `app.saas/__init__.py` (circular import fix)
 - `.gitignore` — added `*.original` pattern for migration backups
 - Route inventory, auth matrix, OpenAPI, file audit ledger regenerated
-- `docs/RUN_JOB_CHARACTERIZATION.md` — stale `_helpers.py` reference updated
+- `docs/archive/RUN_JOB_CHARACTERIZATION.md` — stale `_helpers.py` reference updated
 - Frontend esbuild bundler with code splitting (106 KB CSS < 200 KB threshold)
 - Production Docker Compose uses split-volume layout (read-only root filesystem)
 - Updated route inventory and auth matrix generators
@@ -66,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 5 stale `worktree-agent-*` branches deleted
 - `backend/tests/helpers.py` — orphaned dead code (zero imports) deleted
 - 3 review routes had `unknown_tenant` scope — added to `TENANT_SCOPED_PREFIXES`
-- 41 undocumented `.env.example` vars — documented in `docs/CONFIG_AUDIT.md`
+- 41 undocumented `.env.example` vars — documented in `docs/archive/CONFIG_AUDIT.md`
 - `coverage/` and `artifacts/frontend_review/` added to `.gitignore` (35 PNGs, 3.7 MB removed from tracking)
 - `backend/migrations/008_postgres_storage_v8.sql.original` — stale 14 KB pg_dump backup removed from tracking and disk
 - `test_security_audit.py` — extra blank line removed (ruff-format)

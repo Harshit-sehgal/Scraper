@@ -28,11 +28,9 @@ def reset_world_state() -> None:
     from app.llm_bridge import reset_plugin_manager
     from app.semantic_allocation_engine import reset_role_engine
     from app.semantic_boundary_engine import reset_boundary_engine
-    from app.semantic_os import reset_semantic_os
 
     reset_dispatcher()
     reset_scheduler()
-    reset_semantic_os()
     reset_immune_system()
     reset_role_engine()
     reset_boundary_engine()

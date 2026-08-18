@@ -5,7 +5,7 @@ pipeline. It determines whether global AI structuring is needed,
 applies it with timeout handling, and produces a structured report.
 
 This is the first extraction from the ``run_job`` monolith as part
-of the L1 strangler refactor. See ``docs/RUN_JOB_CHARACTERIZATION.md``
+of the L1 strangler refactor. See ``docs/archive/RUN_JOB_CHARACTERIZATION.md``
 for the full extraction plan.
 """
 

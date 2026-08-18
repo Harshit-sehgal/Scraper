@@ -1,5 +1,5 @@
 {
-  "route_count": 185,
+  "route_count": 187,
   "routes": [
     {
       "method": "GET",
@@ -107,6 +107,30 @@
       "route_dependency": "require_role",
       "stable_or_experimental": "stable",
       "tenant_scoped": "no",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/billing/dodo/checkout",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/billing/dodo/webhook",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "none",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
       "test_coverage": "yes"
     },
     {
@@ -256,11 +280,11 @@
     {
       "method": "DELETE",
       "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
+      "notes": "route dependency accepts admin/operator",
       "path": "/api/jobs/cleanup/terminal",
       "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -268,11 +292,11 @@
     {
       "method": "DELETE",
       "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
+      "notes": "route dependency accepts admin/operator",
       "path": "/api/jobs/{job_id}",
       "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -772,11 +796,11 @@
     {
       "method": "DELETE",
       "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
+      "notes": "route dependency accepts admin/operator",
       "path": "/api/recycle_bin",
       "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -796,11 +820,11 @@
     {
       "method": "DELETE",
       "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
+      "notes": "route dependency accepts admin/operator",
       "path": "/api/recycle_bin/{job_id}",
       "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -808,11 +832,11 @@
     {
       "method": "POST",
       "middleware_protected": "yes",
-      "notes": "require_role/admin-only dependency",
+      "notes": "route dependency accepts admin/operator",
       "path": "/api/recycle_bin/{job_id}/restore",
       "public_protected_unknown": "protected",
-      "required_role": "admin",
-      "route_dependency": "require_role",
+      "required_role": "operator-or-admin",
+      "route_dependency": "require_principal",
       "stable_or_experimental": "stable",
       "tenant_scoped": "yes",
       "test_coverage": "yes"
@@ -2224,6 +2248,31 @@
   ],
   "unknown_auth_count": 0,
   "unknown_auth_routes": [],
-  "unknown_tenant_scope_count": 0,
-  "unknown_tenant_scope_routes": []
+  "unknown_tenant_scope_count": 2,
+  "unknown_tenant_scope_routes": [
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/billing/dodo/checkout",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "require_role",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "yes"
+    },
+    {
+      "method": "POST",
+      "middleware_protected": "yes",
+      "notes": "protected by global /api middleware; no route-level role dependency; mutation role should be reviewed Tenant scope unknown; candidate follow-up required.",
+      "path": "/api/billing/dodo/webhook",
+      "public_protected_unknown": "protected",
+      "required_role": "authenticated-user",
+      "route_dependency": "none",
+      "stable_or_experimental": "stable",
+      "tenant_scoped": "unknown",
+      "test_coverage": "yes"
+    }
+  ]
 }

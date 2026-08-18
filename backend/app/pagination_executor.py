@@ -200,6 +200,10 @@ class PaginationConfig:
     selector: str | None = None  # CSS selector for next button / load more
     url_pattern: str | None = None  # e.g., "https://example.com?page={page}"
     stop_condition: str | None = None
+    on_page_fetch: Callable[[str], bool] | None = None
+    # Metering hook, fired once per *additional* page fetched (page 1 is the
+    # caller's own base fetch and is never reported). Returning False stops
+    # pagination with ``stopped_reason == "quota_exceeded"``.
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +354,12 @@ async def _async_paginate_next_button(
             logger.warning("Next button click failed: %s", exc)
             result.stopped_reason = "error"
             result.error = str(exc)
+            break
+
+        # Metering hook: every click navigates to a new page (page 1 is the
+        # caller's own base fetch and is never reported).
+        if config.on_page_fetch is not None and not config.on_page_fetch(page.url):
+            result.stopped_reason = "quota_exceeded"
             break
 
         result.pages_scraped += 1
@@ -616,6 +626,12 @@ async def _async_paginate_page_number(
             result.stopped_reason = "button_gone"
             break
 
+        # Metering hook: every click navigates to a new page (page 1 is the
+        # caller's own base fetch and is never reported).
+        if config.on_page_fetch is not None and not config.on_page_fetch(page.url):
+            result.stopped_reason = "quota_exceeded"
+            break
+
         result.pages_scraped += 1
 
         # Extract records from this page
@@ -738,6 +754,12 @@ async def _async_paginate_url_pattern(
 
             # Wait for DOM stabilization
             await asyncio.sleep(config.delay_between_pages)
+
+            # Metering hook: page 1 is the caller's own base fetch; every
+            # subsequent page is a new fetch and is reported once here.
+            if page_num > 1 and config.on_page_fetch is not None and not config.on_page_fetch(safe_url):
+                result.stopped_reason = "quota_exceeded"
+                break
         except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError, ValueError) as exc:
             logger.warning("Failed to navigate to page %d: %s", page_num, exc)
             result.stopped_reason = "error"

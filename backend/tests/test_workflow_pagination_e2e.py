@@ -232,5 +232,149 @@ def test_workflow_load_more_no_button_returns_empty_quickly() -> None:
     )
 
 
+def _make_url_pattern_workflow(start_url: str) -> dict[str, Any]:
+    """Build a workflow-dict with pagination_config.strategy='url_pattern'."""
+    from app.models import WorkflowPaginationConfig, WorkflowStatus, WorkflowStep, WorkflowStepType
+
+    pagination = WorkflowPaginationConfig(
+        enabled=True,
+        strategy="url_pattern",
+        max_pages=3,
+        url_pattern="https://example.com/catalog?page={page}",
+    )
+    return {
+        "id": "wf-e2e-url-pattern-001",
+        "name": "URL Pattern E2E",
+        "description": "url_pattern metering e2e",
+        "steps": [
+            WorkflowStep(step_type=WorkflowStepType.OPEN, value=start_url),
+        ],
+        "extraction_schema": [],
+        "pagination_config": pagination,
+        "search_params": {},
+        "status": WorkflowStatus.DRAFT,
+        "mode": "workflow_replay",
+        "start_url": start_url,
+        "original_url": start_url,
+        "auth_profile_id": None,
+        "version": 1,
+    }
+
+
+def _make_workflow(workflow_dict: dict[str, Any]) -> Any:
+    """Instantiate a Workflow from a fixture dict, pinning the id."""
+    from app.models import Workflow
+
+    workflow = Workflow(**{k: v for k, v in workflow_dict.items() if k != "id"})
+    workflow.id = workflow_dict["id"]
+    return workflow
+
+
+# ─── Tests ──────────────────────────────────────────────────────────────
+
+
+def test_pagination_meter_wired_into_async_paginate_and_records_usage(monkeypatch) -> None:
+    """url_pattern workflow pagination must meter PAGE_FETCHED via the hook."""
+    import app.pagination_executor as pagination_mod
+    import app.plan_enforcer as plan_enforcer_mod
+    from app import workflow_executor
+    from app.pagination_executor import PaginationResult
+    from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+    get_usage_ledger().reset_quotas()
+
+    workflow = _make_workflow(_make_url_pattern_workflow("https://example.com/catalog"))
+    workflow.user_id = "meter-user-001"
+    workflow.org_id = "meter-org-001"
+    workflow.project_id = "meter-proj-001"
+
+    captured: dict[str, Any] = {}
+
+    async def _fake_async_paginate(page_arg: Any, config: Any, extract_fn: Any = None, **kwargs: Any) -> PaginationResult:
+        captured["config"] = config
+        return PaginationResult(stopped_reason="max_pages")
+
+    monkeypatch.setattr(pagination_mod, "async_paginate", _fake_async_paginate)
+
+    page = _MockPage()
+    _run(workflow_executor._paginate_and_extract(page=page, workflow=workflow))
+
+    config = captured["config"]
+    assert config.on_page_fetch is not None, "workflow pagination must install the metering hook"
+
+    # An additional page fetch is metered and allowed while quota remains.
+    # (Page 1 is never handed to the hook — that is the executor's contract,
+    # pinned by the TestPaginationOnPageFetchHook suite.)
+    assert config.on_page_fetch("https://example.com/catalog?page=2") is True
+
+    _allowed, details = plan_enforcer_mod.check_usage_limit(
+        "meter-org-001",
+        UsageType.PAGE_FETCHED,
+        org_id="meter-org-001",
+        project_id="meter-proj-001",
+    )
+    assert details["current_usage"] == 1, (
+        f"exactly one PAGE_FETCHED record expected; got current_usage={details['current_usage']!r}"
+    )
+
+
+def test_pagination_meter_stops_when_quota_exhausted(monkeypatch) -> None:
+    """The workflow hook returns False once PAGE_FETCHED quota is exhausted."""
+    import app.pagination_executor as pagination_mod
+    import app.plan_enforcer as plan_enforcer_mod
+    from app import workflow_executor
+    from app.pagination_executor import PaginationResult
+    from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+    get_usage_ledger().reset_quotas()
+    monkeypatch.setitem(plan_enforcer_mod._PLAN_LIMITS, ("free", UsageType.PAGE_FETCHED), 1)
+
+    workflow = _make_workflow(_make_url_pattern_workflow("https://example.com/catalog"))
+    workflow.user_id = "meter-user-002"
+    workflow.org_id = "meter-org-002"
+    workflow.project_id = "meter-proj-002"
+
+    captured: dict[str, Any] = {}
+
+    async def _fake_async_paginate(page_arg: Any, config: Any, extract_fn: Any = None, **kwargs: Any) -> PaginationResult:
+        captured["config"] = config
+        return PaginationResult(stopped_reason="max_pages")
+
+    monkeypatch.setattr(pagination_mod, "async_paginate", _fake_async_paginate)
+
+    page = _MockPage()
+    _run(workflow_executor._paginate_and_extract(page=page, workflow=workflow))
+
+    config = captured["config"]
+    assert config.on_page_fetch is not None
+
+    assert config.on_page_fetch("https://example.com/catalog?page=2") is True, "first additional page fits"
+    assert config.on_page_fetch("https://example.com/catalog?page=3") is False, (
+        "second additional page must exceed the quota of 1 and stop pagination"
+    )
+
+
+def test_pagination_meter_absent_without_owner(monkeypatch) -> None:
+    """Owner-less workflows get no hook (no tenant to meter against)."""
+    import app.pagination_executor as pagination_mod
+    from app import workflow_executor
+    from app.pagination_executor import PaginationResult
+
+    workflow = _make_workflow(_make_url_pattern_workflow("https://example.com/catalog"))
+
+    captured: dict[str, Any] = {}
+
+    async def _fake_async_paginate(page_arg: Any, config: Any, extract_fn: Any = None, **kwargs: Any) -> PaginationResult:
+        captured["config"] = config
+        return PaginationResult(stopped_reason="max_pages")
+
+    monkeypatch.setattr(pagination_mod, "async_paginate", _fake_async_paginate)
+
+    page = _MockPage()
+    _run(workflow_executor._paginate_and_extract(page=page, workflow=workflow))
+
+    assert captured["config"].on_page_fetch is None, "owner-less workflow must not install a metering hook"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-q", "--tb=short"])

@@ -410,6 +410,105 @@ def test_worker_queue_enqueue_enforces_scheduled_job_quota(tmp_path, monkeypatch
     assert ledger.get_usage("user-scheduled", UsageType.SCHEDULED_JOB) == []
 
 
+def test_create_job_hard_stops_when_page_fetch_budget_exceeds_quota(client, monkeypatch) -> None:
+    """PRD §4 hard-stop: job creation is rejected when the job's
+    upper-bound page-fetch cost (urls x max_pages) exceeds the remaining
+    PAGE_FETCHED quota. Page fetches are the billed dimension; a job
+    that cannot run must not be created (a run-time-only cap lets the
+    user burn quota mid-run and die silently)."""
+    import app.main as main_mod
+    import app.plan_enforcer as plan_enforcer_mod
+
+    monkeypatch.setitem(plan_enforcer_mod._PLAN_LIMITS, ("free", UsageType.PAGE_FETCHED), 3)
+    ledger = UsageLedger()
+    ledger.set_quota("dev-admin", UsageType.PAGE_FETCHED, limit=3, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "name": "over-budget",
+            "mode": "manual",
+            "urls": ["https://example.com"],
+            "max_pages": 5,
+        },
+    )
+
+    assert response.status_code == 429
+    assert "page_fetched" in response.json()["detail"]
+    assert main_mod.jobs_store == {}
+    assert ledger.get_usage("dev-admin", UsageType.JOB_CREATED) == []
+
+
+def test_create_job_allows_when_page_fetch_budget_fits_quota(client, monkeypatch) -> None:
+    """PRD §4 hard-stop boundary: a manual job whose upper-bound cost
+    exactly fits the remaining PAGE_FETCHED quota is created."""
+    import app.plan_enforcer as plan_enforcer_mod
+
+    monkeypatch.setitem(plan_enforcer_mod._PLAN_LIMITS, ("free", UsageType.PAGE_FETCHED), 5)
+    ledger = UsageLedger()
+    ledger.set_quota("dev-admin", UsageType.PAGE_FETCHED, limit=5, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "name": "fits-budget",
+            "mode": "manual",
+            "urls": ["https://example.com"],
+            "max_pages": 5,
+        },
+    )
+
+    assert response.status_code == 201
+    job_id = response.json()["job_id"]
+    records = ledger.get_usage("dev-admin", UsageType.JOB_CREATED)
+    assert len(records) == 1
+    assert records[0].metadata["job_id"] == job_id
+    assert ledger.get_usage("dev-admin", UsageType.PAGE_FETCHED) == []
+
+
+def test_create_job_skips_page_budget_check_without_quota(client, monkeypatch) -> None:
+    """No PAGE_FETCHED quota row means no hard-stop (unlimited tier)."""
+    import app.main as main_mod
+
+    ledger = UsageLedger()
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    response = client.post(
+        "/api/jobs",
+        json={
+            "name": "no-quota",
+            "mode": "manual",
+            "urls": ["https://example.com"],
+            "max_pages": 50,
+        },
+    )
+
+    assert response.status_code == 201
+    assert main_mod.jobs_store.get(response.json()["job_id"]) is not None
+
+
+def test_create_job_skips_page_budget_check_for_discovery_mode(client, monkeypatch) -> None:
+    """Discovery/topic jobs have unknown URL lists at creation time; the
+    runtime per-page quota check remains their cap (no hard-stop here)."""
+    import app.main as main_mod
+    import app.plan_enforcer as plan_enforcer_mod
+
+    monkeypatch.setitem(plan_enforcer_mod._PLAN_LIMITS, ("free", UsageType.PAGE_FETCHED), 3)
+    ledger = UsageLedger()
+    ledger.set_quota("dev-admin", UsageType.PAGE_FETCHED, limit=3, period=QuotaPeriod.MONTHLY)
+    monkeypatch.setattr(usage_mod, "usage_ledger", ledger)
+
+    response = client.post(
+        "/api/jobs",
+        json={"name": "topic-job", "mode": "auto", "topic": "widgets"},
+    )
+
+    assert response.status_code == 201
+    assert main_mod.jobs_store.get(response.json()["job_id"]) is not None
+
+
 def test_create_job_enforces_scheduled_job_quota_in_worker_mode(client, tmp_path, monkeypatch) -> None:
     from app.main import jobs_store
     from app.worker_queue import get_worker_queue, reset_worker_queue

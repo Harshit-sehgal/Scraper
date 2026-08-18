@@ -291,33 +291,45 @@
               <h3>Free</h3>
               <div class="pricing-price">$0<span>/mo</span></div>
               <ul class="pricing-features">
-                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 3 concurrent jobs</li>
-                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 100 records / job</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 10 jobs / month</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 1,000 page fetches</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 5 scheduled jobs</li>
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> CSV + JSON export</li>
-                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Community support</li>
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Basic audit log</li>
               </ul>
-              <a href="/app/" class="btn secondary block">Get started</a>
+              <a href="#signup" class="btn secondary block">Get started</a>
+            </div>
+            <div class="pricing-card reveal">
+              <h3>Starter</h3>
+              <div class="pricing-price">$15<span>/mo</span></div>
+              <ul class="pricing-features">
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 100 jobs / month</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 10,000 page fetches</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 50 scheduled jobs</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Change tracking</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Email support</li>
+              </ul>
+              <a href="#signup" class="btn secondary block">Get started</a>
             </div>
             <div class="pricing-card recommended reveal">
               <span class="pricing-recommended-badge">Recommended</span>
               <h3>Pro</h3>
               <div class="pricing-price">$29<span>/mo</span></div>
               <ul class="pricing-features">
-                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 20 concurrent jobs</li>
-                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 10,000 records / job</li>
-                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Excel + streaming</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 1,000 jobs / month</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 100,000 page fetches</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> 500 scheduled jobs</li>
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Auth profiles</li>
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Priority support</li>
               </ul>
-              <a href="/app/" class="btn primary block">Get started</a>
+              <a href="#signup" class="btn primary block">Get started</a>
             </div>
             <div class="pricing-card reveal">
               <h3>Enterprise</h3>
               <div class="pricing-price">Custom</div>
               <ul class="pricing-features">
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Unlimited jobs</li>
-                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Unlimited records</li>
+                <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Unlimited fetches</li>
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> SSO + RBAC</li>
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> SLA guarantee</li>
                 <li><span data-icon="check" data-size="14" aria-hidden="true"></span> Dedicated support</li>
@@ -325,6 +337,46 @@
               <a href="mailto:hello@dataforge.dev" class="btn secondary block">Contact us</a>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Signup -->
+      <section class="signup" id="signup">
+        <div class="signup-inner">
+          <h2 class="reveal">Create your account</h2>
+          <p class="signup-sub reveal">Free tier, no card required. Accept the AUP on first login.</p>
+          <form id="signup-form" class="signup-form reveal" novalidate>
+            <label class="signup-field">
+              <span>Name</span>
+              <input type="text" name="display_name" maxlength="255" autocomplete="name" />
+            </label>
+            <label class="signup-field">
+              <span>Email</span>
+              <input type="email" name="email" maxlength="320" required autocomplete="email" />
+            </label>
+            <label class="signup-field">
+              <span>Password</span>
+              <input
+                type="password"
+                name="password"
+                minlength="8"
+                maxlength="128"
+                required
+                autocomplete="new-password"
+              />
+            </label>
+            <label class="signup-field">
+              <span>Organization (optional)</span>
+              <input type="text" name="org_name" maxlength="255" autocomplete="organization" />
+            </label>
+            <p id="signup-error" class="signup-error" role="alert" style="display: none"></p>
+            <button type="submit" class="btn primary lg block" id="signup-submit">Create account</button>
+            <p class="signup-legal">
+              By creating an account you agree to the
+              <a href="/legal/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and
+              <a href="/legal/aup" target="_blank" rel="noopener noreferrer">Acceptable Use Policy</a>.
+            </p>
+          </form>
         </div>
       </section>
 
@@ -395,6 +447,9 @@
         <div class="footer-row">
           <span class="footer-copy">&copy; 2026 DataForge. All systems operational.</span>
           <div class="footer-links">
+            <a href="/legal/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+            <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy</a>
+            <a href="/legal/aup" target="_blank" rel="noopener noreferrer">AUP</a>
             <a href="/api/docs" target="_blank" rel="noopener noreferrer">API Reference</a>
             <a href="/api/system/status" target="_blank" rel="noopener noreferrer">Status</a>
           </div>
@@ -402,6 +457,6 @@
       </div>
     </footer>
 
-    <script type="module" src="/landing/app.js?v=2"></script>
+    <script type="module" src="/landing/app.js?v=3"></script>
   </body>
 </html>

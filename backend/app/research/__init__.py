@@ -62,7 +62,6 @@ RESEARCH_MODULES: frozenset[str] = frozenset(
     {
         # ── Semantic world state and friends ────────────────────────────
         "semantic_world_state",  # package (submodules: core, events, locks, etc.)
-        "semantic_os",
         "semantic_ir",
         "semantic_persistence",
         "semantic_mapper",
@@ -76,13 +75,11 @@ RESEARCH_MODULES: frozenset[str] = frozenset(
         # ── Topology / manifold / motif / energy / instability ──────────
         "topology_state",
         "topology_state_types",
-        "topology_api",
         "topology_view",
         "topology_dynamics",
         "topology_clustering",
         "topology_persistence",
         "topology_metrics",
-        "topology_gc",
         "topology_forces",
         "topology_thermodynamics",
         "topology_waves",
@@ -92,7 +89,6 @@ RESEARCH_MODULES: frozenset[str] = frozenset(
         "motif_state",
         "motif_feedback",
         "energy_state",
-        "energy_api",
         "instability_state",
         "instability_api",
         # ── Foundational research types / observability ─────────────────
@@ -158,7 +154,6 @@ _EXTRA_RESEARCH_MODULES: frozenset[str] = frozenset(
         # research replay path. Classify as research for now.
         "event_journal",
         "history_state",
-        "persistence_state",
         "telemetry_state",
         "transition_state",
         "crawl_state",
@@ -168,7 +163,6 @@ _EXTRA_RESEARCH_MODULES: frozenset[str] = frozenset(
         # validated product contract.
         "resource_governor",
         "runtime_budget",
-        "transactional_priority_queue",
         "transaction_context",
         # ── Domain health / domain runtime policy ──────────────────────
         # Production routing uses `crawl_policy`. The runtime-policy and
@@ -196,7 +190,7 @@ def is_research_module(name: str | None) -> bool:
     `name` may be a bare module basename (e.g. `"semantic_world_state"`)
     or a dotted import path with any number of sub-modules
     (e.g. `"app.semantic_world_state.core"` or
-    `"backend.app.semantic_os.events"`). The function strips any
+    `"backend.app.topology_state.events"`). The function strips any
     leading `backend.` / `app.` / `src.` segments and tests the first
     remaining segment against the registry.
 
@@ -216,7 +210,7 @@ def is_research_path(qualified_name: str | None) -> bool:
         True
         >>> is_research_path("app.scraper")
         False
-        >>> is_research_path("backend.app.semantic_os")
+        >>> is_research_path("backend.app.topology_state")
         True
 
     """
@@ -263,13 +257,11 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             "topology_state",
             "topology_state_types",
-            "topology_api",
             "topology_view",
             "topology_dynamics",
             "topology_clustering",
             "topology_persistence",
             "topology_metrics",
-            "topology_gc",
             "topology_forces",
             "topology_thermodynamics",
             "topology_waves",
@@ -279,7 +271,6 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "motif_state",
             "motif_feedback",
             "energy_state",
-            "energy_api",
             "instability_state",
             "instability_api",
         ),
@@ -337,7 +328,6 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
             "scraper_recovery_integration",
             "event_journal",
             "history_state",
-            "persistence_state",
             "telemetry_state",
             "transition_state",
             "crawl_state",
@@ -348,7 +338,6 @@ _FAMILY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             "resource_governor",
             "runtime_budget",
-            "transactional_priority_queue",
             "transaction_context",
             "event_dispatcher",
             "policy_engine",

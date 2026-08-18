@@ -3,7 +3,7 @@
 Date: 2026-06-13
 Commit: `7d47045`
 
-This document describes the security architecture for the current checkout. For threat models, see `artifacts/audit/AUTH_PROFILE_THREAT_MODEL.md`. For safety/acceptable-use policy, see `docs/SAFETY_AND_ACCEPTABLE_USE.md`.
+This document describes the security architecture for the current checkout. For threat models, see `artifacts/audit/AUTH_PROFILE_THREAT_MODEL.md`. For safety/acceptable-use policy, see `docs/archive/SAFETY_AND_ACCEPTABLE_USE.md`.
 
 ---
 
@@ -104,7 +104,7 @@ Covered resources: jobs, results, events, exports, recycle bin, workflows, auth 
 
 ## 7. Audit Logging
 
-See `docs/AUDIT_LOGS.md`. Covers: auth events, RBAC decisions, admin actions, data access, job lifecycle, system events.
+See `docs/archive/AUDIT_LOGS.md`. Covers: auth events, RBAC decisions, admin actions, data access, job lifecycle, system events.
 
 ---
 

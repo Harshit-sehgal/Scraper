@@ -1,6 +1,5 @@
 import logging
 import time
-from collections.abc import Callable
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
@@ -190,28 +189,6 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._topology.record_cohesion_split_success(pair)
 
     # ─── Substrate Branching (Phase 39) ──────────────────────────────────
-
-    def branch(self, label: str) -> "SemanticWorldState":
-        """Create an isolated branch of the current semantic world (Phase 39)."""
-        import uuid
-
-        child_id = f"{self._node_id}-br-{str(uuid.uuid4())[:4]}"
-        child = SemanticWorldState(node_id=child_id)
-
-        # Clone state via serialization
-        state_snapshot = self.to_dict()
-        child.from_dict(state_snapshot)
-
-        # RESTORE child specific identifiers
-        child.node_id = child_id
-        child._parent_node_id = self._node_id
-        child._branch_label = label
-
-        # Initialize child's vector clock as a descendant of parent
-        child._vector_clock.update(self._vector_clock.get_clock())
-
-        logger.info("SUBSTRATE BRANCHED: [%s] -> [%s] (Label: %s)", self.node_id, child_id, label)
-        return child
 
     # ─── Transaction Manager (MVCC & Thread Safety) ──────────────────────
 
@@ -781,9 +758,6 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
     def remove_intent(self, intent_id: str) -> None:
         self._intent.remove_intent(intent_id)
 
-    def clear_intents(self) -> None:
-        self._intent.clear()
-
     @property
     def active_intents(self) -> dict[str, Any]:
         return self._intent.active_intents
@@ -792,9 +766,6 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
 
     def register_action(self, action_id: str, target_vec: list[Any], handler_name: str, threshold: float = 0.3) -> None:
         self._action.register_action(action_id, target_vec, handler_name, threshold)
-
-    def log_action_execution(self, action_id: str, success: bool, details: dict | None = None) -> None:
-        self._action.log_execution(action_id, success, details)
 
     def get_action(self, action_id: str) -> dict | None:
         return self._action.get_action(action_id)
@@ -847,67 +818,6 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._energy.increment_records(n)
 
     # ─── Dynamic Abstraction & Agency ─────────────────────────────────────
-
-    def dispatch_actions(self) -> int:
-        triggered = 0
-        active_actions = self._action.active_actions
-        if not active_actions:
-            return 0
-
-        from app.llm_bridge import get_plugin_manager
-        from app.policy_engine import get_policy_engine
-
-        policy = get_policy_engine(ws=self)
-        plugins = get_plugin_manager(ws=self)
-        pressure = self.get_system_pressure()
-
-        with self.transaction("action_dispatch"):
-            for region in self._topology.iterate_regions():
-                if region.instability < 0.3:
-                    for role in region.competing_roles:
-                        if not policy.can_dispatch_action(role, pressure):
-                            continue
-
-                        role_vec = self._manifold.get_manifold_vector(role)
-                        if not role_vec:
-                            continue
-
-                        for aid, details in active_actions.items():
-                            target_vec = details["target_vec"]
-                            threshold = details["threshold"]
-                            handler_name = details["handler_name"]
-
-                            dist = sum((a - b) ** 2 for a, b in zip(role_vec, target_vec, strict=False)) ** 0.5
-
-                            if dist < threshold:
-                                logger.info("AGENCY TRIGGERED: Role [%s] activated Action [%s] (Dist: %.4f)", role, aid, dist)
-
-                                success = True
-                                tool_result = None
-                                try:
-                                    tool_result = plugins.call_tool(handler_name, role=role, token=region.token)
-                                except (RuntimeError, ValueError, AttributeError, TypeError, OSError, KeyError) as e:
-                                    logger.warning("Plugin execution failed for %s: %s", handler_name, e)
-                                    success = False
-
-                                self._action.log_execution(
-                                    aid,
-                                    success=success,
-                                    details={
-                                        "role": role,
-                                        "token": region.token,
-                                        "distance": dist,
-                                        "tool_result": str(tool_result)[:100] if tool_result else None,
-                                    },
-                                )
-                                triggered += 1
-                                if success:
-                                    self._manifold.blend_manifold_vector(role, target_vec, alpha=0.95, beta=0.05)
-
-            if triggered > 0:
-                self.record_delta("global", "dispatch_actions", {"count": triggered})
-
-        return triggered
 
     def synthesize_hierarchical_envelopes(self) -> None:
         communities = self._topology.global_communities
@@ -1054,9 +964,6 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         self._scheduler.clear()
         self.last_update_time = time.time()
 
-    def schedule_cognitive_task(self, task_id: str, priority: Any, handler: Callable, *args, **kwargs) -> None:
-        self._scheduler.schedule(task_id, priority, handler, *args, **kwargs)
-
     def process_cognitive_queue(self, budget_ms: float = 100.0) -> int:
         return self._scheduler.step(budget_ms=budget_ms)
 
@@ -1089,41 +996,3 @@ class SemanticWorldState(EventMixin, MemoryMixin, SerializationMixin, MetricsMix
         if new_exclusions:
             diff["new_exclusions"] = [str(e) for e in new_exclusions]
         return diff
-
-    def semantic_diff(self, other: "SemanticWorldState") -> dict[str, Any]:
-        divergence = {
-            "manifold_drift": 0.0,
-            "new_roles": [],
-            "missing_roles": [],
-            "tension_delta": 0.0,
-        }
-
-        local_m = self._manifold.role_manifold
-        other_m = other._manifold.role_manifold
-
-        common_roles = set(local_m.keys()) & set(other_m.keys())
-        if common_roles:
-            n_common = len(common_roles)
-            total_dist = 0.0
-            for r in common_roles:
-                v1, v2 = local_m[r], other_m[r]
-                dist = sum((a - b) ** 2 for a, b in zip(v1, v2, strict=False)) ** 0.5
-                total_dist += dist
-            divergence["manifold_drift"] = total_dist / n_common if n_common > 0 else 0.0
-
-        divergence["new_roles"] = list(set(other_m.keys()) - set(local_m.keys()))
-        divergence["missing_roles"] = list(set(local_m.keys()) - set(other_m.keys()))
-        divergence["tension_delta"] = abs(other.metrics.global_energy - self.metrics.global_energy)
-
-        return divergence
-
-    def merge_branch(self, branch: "SemanticWorldState", alpha: float = 0.5) -> None:
-        """Merge an isolated branch back into the current state (Phase 39)."""
-        with self.transaction(f"merge_branch:{branch.node_id}"):
-            self._manifold.merge(branch._manifold.to_dict(), alpha=alpha)
-            self._instability.merge(branch._instability.to_dict())
-            self._motif.merge(branch._motif.to_dict())
-            self.merge_hierarchical_knowledge(branch._abstraction.to_dict())
-            self._vector_clock.update(branch._vector_clock.get_clock())
-
-            logger.info("SUBSTRATE MERGED: [%s] -> [%s] (Alpha: %s)", branch.node_id, self.node_id, alpha)

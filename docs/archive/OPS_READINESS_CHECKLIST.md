@@ -6,7 +6,7 @@ Status values: ready, partial, missing, unverified.
 | --- | --- | --- | --- |
 | Production secrets generated outside git | partial | `scripts/generate_prod_env.py`, `.env.production.example` | Run checker against real secret store |
 | Production env checker | partial | `scripts/check_prod_env.py` | Store pass log for target environment |
-| TLS | partial | `docs/TLS_DEPLOYMENT.md`, `nginx.conf` tests in CI | Verify cert, HTTPS health, HSTS, redirects |
+| TLS | partial | `docs/archive/TLS_DEPLOYMENT.md`, `nginx.conf` tests in CI | Verify cert, HTTPS health, HSTS, redirects |
 | API health | partial | `/health` route | Verify from external monitor |
 | API readiness | partial | `/ready` route checks storage | Verify failure/recovery behavior |
 | Docker image | partial | `Dockerfile` production target | Build, scan, and run image in staging |

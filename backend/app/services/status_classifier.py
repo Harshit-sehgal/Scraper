@@ -7,7 +7,7 @@ error messages and completion timestamps.
 
 This is the third extraction from the ``run_job`` monolith as part
 of the L1 strangler refactor (Phase 9 of 9). See
-``docs/RUN_JOB_CHARACTERIZATION.md`` for the full extraction plan.
+``docs/archive/RUN_JOB_CHARACTERIZATION.md`` for the full extraction plan.
 """
 
 from __future__ import annotations

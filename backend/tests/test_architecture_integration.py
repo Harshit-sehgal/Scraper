@@ -67,23 +67,6 @@ def test_event_journal_tracks_mutations() -> None:
     j.clear()
 
 
-def test_topology_gc_removes_stale() -> None:
-    """topology_gc must remove stale field regions."""
-    from app.core_types import FieldConflictRegion
-
-    regions = [
-        FieldConflictRegion(competing_roles=["a", "b"], token="ALIVE", instability=0.5, local_energy=5.0),
-        FieldConflictRegion(competing_roles=["c", "d"], token="DEAD", instability=0.01, local_energy=0.1),
-    ]
-    # We can't test with SemanticWorldState (tracked file reverts),
-    # but we verify the GC logic works on a list
-    before = len(regions)
-    alive = [r for r in regions if r.instability > 0.02 or r.local_energy > 0.5]
-    removed = before - len(alive)
-    assert removed == 1
-    assert alive[0].token == "ALIVE"
-
-
 def test_field_validator_detects_nan() -> None:
     """field_validator must detect NaN values."""
     from app.energy_state import EnergyState
@@ -125,7 +108,7 @@ def _app_path(rel_path: str) -> str:
 
 def test_mutation_apis_have_rw_separation() -> None:
     """API classes must have separate read/write sections."""
-    for name in ["topology_api", "energy_api", "instability_api"]:
+    for name in ["instability_api"]:
         with open(_app_path(f"app/{name}.py")) as f:
             content = f.read()
         assert "Query Operations" in content, f"{name} missing Query section"
@@ -145,13 +128,6 @@ def test_field_laws_are_accessible() -> None:
     assert MAX_COUPLING_TRANSFER == 0.3
     assert MAX_INSTABILITY_FLUX == 0.2
     assert MAX_ATTRACTOR_PULL == 2.0
-
-
-def test_persistence_state_has_clear() -> None:
-    """persistence_state must expose clear_world_state."""
-    from app.persistence_state import clear_world_state
-
-    assert callable(clear_world_state)
 
 
 def test_invariant_firewall_decorator() -> None:
@@ -178,23 +154,19 @@ def test_core_types_are_shared() -> None:
     assert 0.0 <= es.global_energy <= 10.0
 
 
-def test_all_14_modules_are_importable() -> None:
-    """All 14 extracted modules must import without error."""
+def test_all_kept_modules_are_importable() -> None:
+    """All kept extracted modules must import without error."""
     modules = [
         "app.core_types",
         "app.topology_state",
         "app.energy_state",
         "app.instability_state",
-        "app.topology_api",
-        "app.energy_api",
         "app.instability_api",
         "app.event_journal",
-        "app.topology_gc",
         "app.invariant_firewall",
         "app.field_validator",
         "app.observability",
         "app.field_laws",
-        "app.persistence_state",
     ]
     for m in modules:
         try:

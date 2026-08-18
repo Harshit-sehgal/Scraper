@@ -1,7 +1,7 @@
 """Local benchmark corpus baseline tests.
 
 These tests enforce versioned expected outputs and local-only thresholds for
-the fixture corpus documented in docs/BENCHMARK_PLAN.md.
+the fixture corpus documented in docs/archive/BENCHMARK_PLAN.md.
 """
 
 from __future__ import annotations

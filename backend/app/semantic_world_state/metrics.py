@@ -118,34 +118,3 @@ class MetricsMixin:
     # ─── Garbage Collection Gateway APIs ────────────────────────────────
     # These encapsulate all GC operations so topology_gc.py never needs
     # to access sub-states directly — strengthening the ownership boundary.
-
-    def gc_collect_stale_regions(self, min_instability: float = 0.02, min_energy: float = 0.5) -> int:
-        """Remove field regions below thresholds. Returns count removed."""
-        before = self._topology.region_count()
-        self._topology.filter_regions(lambda r: r.instability > min_instability or r.local_energy > min_energy)
-        return before - self._topology.region_count()
-
-    def gc_collect_stale_motifs(self, threshold: float = 0.05) -> int:
-        """Remove motifs that have decayed below usefulness threshold. Returns count removed."""
-        before = self._motif.count()
-        self._motif.prune_weak(threshold=threshold)
-        return before - self._motif.count()
-
-    def gc_collect_stale_exclusions(self, threshold: float = 0.01) -> int:
-        """Remove very weak exclusions. Returns count removed."""
-        return self._instability.prune_exclusions_weak(threshold=threshold)
-
-    def gc_trim_snapshots(self, max_size: int = 500, keep: int = 250) -> int:
-        """Trim excess topology snapshots. Returns count removed."""
-        before = len(self._history.get_snapshots())
-        self._history.trim_snapshots(max_size=max_size, keep=keep)
-        return before - len(self._history.get_snapshots())
-
-    def gc_collect(self) -> dict[str, Any]:
-        """Run full garbage collection cycle. Returns dict with counts per category."""
-        return {
-            "regions": self.gc_collect_stale_regions(),
-            "motifs": self.gc_collect_stale_motifs(),
-            "exclusions": self.gc_collect_stale_exclusions(),
-            "snapshots": self.gc_trim_snapshots(),
-        }

@@ -44,7 +44,7 @@ Bounds and limits that protect the platform from runaway resource consumption. T
 | Max workflows | 2 | 20 | 200 | ❌ |
 | Max scheduled jobs | 1 | 10 | 100 | ❌ |
 
-See `docs/USAGE_AND_BILLING.md` for quota enforcement implementation.
+See `docs/archive/USAGE_AND_BILLING.md` for quota enforcement implementation.
 
 ---
 

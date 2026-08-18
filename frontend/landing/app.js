@@ -93,4 +93,52 @@ document.addEventListener("DOMContentLoaded", () => {
       link.addEventListener("click", closeMobileMenu);
     });
   }
+
+  // ─── Self-service signup (POST /api/saas/signup) ───
+
+  const signupForm = document.getElementById("signup-form");
+  if (signupForm) {
+    const errorEl = document.getElementById("signup-error");
+    const submitBtn = document.getElementById("signup-submit");
+
+    signupForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (errorEl) errorEl.style.display = "none";
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Creating account…";
+      }
+
+      const formData = new FormData(signupForm);
+      const payload = {
+        email: String(formData.get("email") || "").trim(),
+        password: String(formData.get("password") || ""),
+        display_name: String(formData.get("display_name") || "").trim(),
+        org_name: String(formData.get("org_name") || "").trim() || null,
+      };
+
+      try {
+        const resp = await fetch("/api/saas/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail;
+          throw new Error(detail || `Signup failed (HTTP ${resp.status})`);
+        }
+        window.location.href = "/app/";
+      } catch (err) {
+        if (errorEl) {
+          errorEl.textContent = err instanceof Error ? err.message : "Signup failed. Please try again.";
+          errorEl.style.display = "block";
+        }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Create account";
+        }
+      }
+    });
+  }
 });

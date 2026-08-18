@@ -525,11 +525,14 @@ class _SqliteConnCtx:
     manages transaction commit/rollback.  The connection itself stays
     open until garbage-collected — that's a file-descriptor leak under
     sustained load.  Use this wrapper everywhere we need a connection
-    that closes deterministically.
+    that closes deterministically.  ``isolation_level=None`` runs in
+    autocommit mode so single-statement writes persist on close (the
+    default deferred mode rolls back uncommitted INSERTs when the
+    connection is closed).
     """
 
     def __init__(self, path: str) -> None:
-        self._conn: sqlite3.Connection | None = sqlite3.connect(path)
+        self._conn: sqlite3.Connection | None = sqlite3.connect(path, isolation_level=None)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=FULL")
         self._conn.row_factory = sqlite3.Row

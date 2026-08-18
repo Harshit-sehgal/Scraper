@@ -67,7 +67,7 @@ curl -s http://localhost:8000/api/exports/<job_id>/xlsx > results.xlsx
 
 **Experimental modules** — research features kept separate from the product path:
 - Selector memory, strategy evolution, semantic world state, topology/federation, replay, chaos engineering, adaptive scoring modules.
-- These are documented in [`docs/MODULE_CLASSIFICATION.md`](docs/MODULE_CLASSIFICATION.md) and labeled in the codebase. They do not appear in the default product UI or API surface.
+- These are documented in [`docs/archive/MODULE_CLASSIFICATION.md`](docs/archive/MODULE_CLASSIFICATION.md) and labeled in the codebase. They do not appear in the default product UI or API surface.
 
 ## What You Should Know
 
@@ -221,7 +221,7 @@ See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for the full checklist.
 | [`docs/TESTING.md`](docs/TESTING.md) | Test commands and coverage |
 | [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) | Benchmark suite and corpus |
 | [`docs/PRODUCTION.md`](docs/PRODUCTION.md) | Production deployment |
-| [`docs/MODULE_CLASSIFICATION.md`](docs/MODULE_CLASSIFICATION.md) | Core/stable/experimental labels |
+| [`docs/archive/MODULE_CLASSIFICATION.md`](docs/archive/MODULE_CLASSIFICATION.md) | Core/stable/experimental labels |
 
 Archived docs under `docs/archive/` are historical unless explicitly refreshed.
 

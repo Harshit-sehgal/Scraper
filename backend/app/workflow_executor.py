@@ -32,6 +32,7 @@ import asyncio
 import contextlib
 import datetime
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from app.models import Workflow, WorkflowStepType
@@ -249,6 +250,64 @@ async def _extract_records_from_page(
     return records
 
 
+def _build_pagination_meter(workflow: Workflow) -> Callable[[str], bool] | None:
+    """Build the pagination ``on_page_fetch`` hook for a workflow.
+
+    Records one ``PAGE_FETCHED`` usage event per additional page the
+    pagination executor navigates to, keyed by the workflow's owner
+    (org > project > user). Returns ``False`` — stopping pagination —
+    once the owner's plan quota is exhausted.
+
+    Returns ``None`` for owner-less workflows so execution remains
+    possible without a tenant to meter against.
+    """
+    user_id = (getattr(workflow, "user_id", "") or "").strip()
+    org_id = (getattr(workflow, "org_id", "") or "").strip()
+    project_id = (getattr(workflow, "project_id", "") or "").strip()
+    if not user_id:
+        return None
+
+    def on_page_fetch(url: str) -> bool:
+        try:
+            from app.plan_enforcer import check_usage_limit
+            from app.utils.usage_ledger import UsageType, get_usage_ledger
+
+            quota_owner = org_id or project_id or user_id
+            allowed, _details = check_usage_limit(
+                quota_owner,
+                UsageType.PAGE_FETCHED,
+                1,
+                org_id=org_id,
+                project_id=project_id,
+            )
+            if not allowed:
+                logger.warning(
+                    "Pagination page-fetch quota exceeded for owner=%s; stopping pagination",
+                    quota_owner,
+                )
+                return False
+            get_usage_ledger().record_usage(
+                user_id,
+                UsageType.PAGE_FETCHED,
+                quantity=1,
+                metadata={
+                    "url": url,
+                    "source": "workflow_pagination",
+                    "workflow_id": getattr(workflow, "id", "") or "",
+                },
+                org_id=org_id,
+                project_id=project_id,
+            )
+            return True
+        except (RuntimeError, OSError, ValueError, TypeError):
+            # Metering must never break pagination: on any ledger failure
+            # fall back to allowing the fetch.
+            logger.debug("Pagination page-fetch metering skipped", exc_info=True)
+            return True
+
+    return on_page_fetch
+
+
 async def _paginate_and_extract(
     page: Any,
     workflow: Workflow,
@@ -314,6 +373,7 @@ async def _paginate_and_extract(
         max_pages=pagination_config.max_pages,
         selector=pagination_config.selector or None,
         stop_on_duplicates=True,
+        on_page_fetch=_build_pagination_meter(workflow),
     )
 
     result = await async_paginate(

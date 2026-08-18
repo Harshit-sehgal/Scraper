@@ -676,7 +676,7 @@ Plus 14 new API routes in `jobs_write.py` and 8 new Pydantic models in `models.p
 | Dev 6 | `test_openapi_swagger.py` | 8 |
 | Dev 8 | `docker-compose.dev.yml` | — |
 | Dev 14 | 5 tutorial files in `docs/tutorials/` | — |
-| Dev 20 | `docs/CHANGELOG.md` | — |
+| Dev 20 | `docs/archive/CHANGELOG.md` | — |
 | Dev 23 | `docs/extraction_config_schema.json` | — |
 
 #### Wave 8: Observability

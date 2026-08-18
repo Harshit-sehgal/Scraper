@@ -36,7 +36,7 @@ SMOKE_SCRIPT = REPO_ROOT / "scripts" / "smoke_prod_stack.sh"
 LOAD_TEST_SCRIPT = REPO_ROOT / "scripts" / "run_load_test.py"
 LOAD_PROFILE_SCRIPT = REPO_ROOT / "scripts" / "run_load_profile.py"
 ALERT_DRILL_SCRIPT = REPO_ROOT / "scripts" / "run_alert_delivery_drill.py"
-OPS_READINESS_DOC = REPO_ROOT / "docs" / "OPS_READINESS_CHECKLIST.md"
+OPS_READINESS_DOC = REPO_ROOT / "docs" / "archive" / "OPS_READINESS_CHECKLIST.md"
 
 
 def _load_alerts() -> list[dict]:
@@ -193,4 +193,4 @@ class TestOPSReadinessDocumentation:
     """P1-OPS-LOAD-ALERT-001: ops readiness documentation references artifacts."""
 
     def test_ops_readiness_doc_exists(self) -> None:
-        assert OPS_READINESS_DOC.is_file(), "P1-OPS-LOAD-ALERT-001: docs/OPS_READINESS_CHECKLIST.md missing"
+        assert OPS_READINESS_DOC.is_file(), "P1-OPS-LOAD-ALERT-001: docs/archive/OPS_READINESS_CHECKLIST.md missing"

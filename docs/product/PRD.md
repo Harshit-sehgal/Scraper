@@ -1,8 +1,30 @@
-# DataForge Scraper — Product Requirements Document (v1)
+# DataForge Scraper — Product Requirements Document (v1.1)
 
-**Status:** Draft v1
-**Author:** Generated from Phase 2 — SaaS product core definition
-**Last updated:** 2026-06-09
+**Status:** Active v1.1 — scope frozen per `docs/EXECUTION_PLAN.md`
+**Author:** Generated from Phase 2 — SaaS product core definition; v1.1 wedge per execution plan
+**Last updated:** 2026-08-18
+
+---
+
+## 0. The Wedge (v1.1)
+
+Everything in this PRD is subordinate to one sentence:
+
+> **North star:** one agency can sign up, pay for the Starter plan,
+> create a scheduled product-catalog monitor on a consenting public
+> site, and receive a weekly CSV export — on a deployed HTTPS URL,
+> without talking to us.
+
+**v1 ships exactly one wedge:** Use Case 1 (product catalog monitoring)
+delivered as Journey B (scheduled monitoring + export). All other use
+cases, journeys, and tier-table features are explicitly **post-v1**:
+they are not worked on, not promoted, and receive no investment until
+the wedge is live with paying beta users.
+
+**Kill criteria (from the execution plan):** if by the end of Phase 4 we
+cannot get 5 activated beta users from the ICP, we stop feature work
+entirely and decide: open-source it, maintain it as an internal tool, or
+archive it. No Phase 5+ polishing.
 
 ---
 
@@ -37,11 +59,11 @@
 
 ## 3. Supported Use Cases (v1)
 
-| # | Use case | Legal/ethical boundary |
-|---|----------|------------------------|
-| 1 | **Product catalog monitoring** — Extract structured product data (name, price, availability, description) from public e-commerce listings at regular intervals. | Must respect `robots.txt` and terms of service. Must not bypass login walls or CAPTCHA. Rate-limit to <1 req/sec per domain. |
-| 2 | **Public directory / listings extraction** — Extract structured records from public directories (business listings, job postings, public profiles) where the site does not prohibit automated access. | Must not circumvent rate limits or access controls. Must not re-publish sensitive personal data without anonymisation. |
-| 3 | **Content aggregation for research** — Extract article metadata (title, author, publication date, abstract) from public content sites for non-commercial research or internal monitoring. | Must not reproduce full copyrighted articles. Must respect `noindex` / `nofollow` directives. Must include source attribution in exports. |
+| # | Use case | Legal/ethical boundary | v1 status |
+|---|----------|------------------------|-----------|
+| 1 | **Product catalog monitoring** — Extract structured product data (name, price, availability, description) from public e-commerce listings at regular intervals. | Must respect `robots.txt` and terms of service. Must not bypass login walls or CAPTCHA. Rate-limit to <1 req/sec per domain. | **WEDGE — v1 ships this** |
+| 2 | **Public directory / listings extraction** — Extract structured records from public directories (business listings, job postings, public profiles) where the site does not prohibit automated access. | Must not circumvent rate limits or access controls. Must not re-publish sensitive personal data without anonymisation. | post-v1 |
+| 3 | **Content aggregation for research** — Extract article metadata (title, author, publication date, abstract) from public content sites for non-commercial research or internal monitoring. | Must not reproduce full copyrighted articles. Must respect `noindex` / `nofollow` directives. Must include source attribution in exports. | post-v1 |
 
 ### Unsupported scenarios (v1)
 
@@ -71,6 +93,11 @@ correlate linearly with customer value.
 **Overages:** Hard-stop at tier limit for Free/Starter (403 on job creation).
 Pro/Business can configure automatic upgrade or hard-stop.
 
+> Implementation note (2026-08-18): quota rejections return HTTP 429
+> (Too Many Requests, per RFC 6585), matching the codebase-wide
+> convention and all quota tests; "403" above is the product intent
+> (rejection at creation, before the job runs), not the wire status.
+
 **API rate limits:**
 | Tier | Requests/minute | Requests/hour |
 |------|:---------------:|:-------------:|
@@ -85,6 +112,9 @@ Pro/Business can configure automatic upgrade or hard-stop.
 
 ### Journey A — First-time user (signup to first extraction)
 
+> post-v1 (prerequisite steps — signup, job creation, preview, export —
+> are exercised by Journey B but the full onboarding flow ships later)
+
 1. Landing page → Sign up (email + password / Google OAuth)
 2. Email verification → Create first project
 3. Add a job: paste URL, choose schema (auto-detect or manual), select scrape mode
@@ -96,6 +126,8 @@ Pro/Business can configure automatic upgrade or hard-stop.
 
 ### Journey B — Power user (scheduled monitoring)
 
+> **WEDGE — v1 ships this journey.**
+
 1. Create project → Add multiple URLs → Configure schema
 2. Set schedule: daily/weekly at specific time
 3. Receive email/Slack/webhook notification on completion
@@ -104,6 +136,8 @@ Pro/Business can configure automatic upgrade or hard-stop.
 6. Monitor usage against plan limits
 
 ### Journey C — Team admin (managing org)
+
+> post-v1
 
 1. Create organisation → Invite members via email
 2. Assign roles: Admin, Developer, Analyst, Viewer

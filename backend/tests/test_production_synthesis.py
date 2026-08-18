@@ -73,29 +73,3 @@ def test_nested_transaction_causality() -> None:
     # Verify entries are recorded from sub-states
     assert any(e["subsystem"] == "energy" and e["action"] == "set_energy" for e in tx["entries"])
     assert any(e["subsystem"] == "energy" and e["action"] == "set_entropy" for e in tx["entries"])
-
-
-def test_semantic_os_gateway() -> None:
-    from app.semantic_os import get_semantic_os
-
-    sos = get_semantic_os()
-    sos.reset_engine()
-
-    # 1. Ingest via OS
-    schema = ["item", "cost"]
-    sos.ingest_records([{"item": "Phone", "cost": "00"}], schema)
-
-    # 2. Query via OS
-    res = sos.query("STABLE 0.6")
-    assert res["type"] == "roles"
-
-    # 3. Snapshot via OS
-    path = sos.save_snapshot(label="os_test")
-    assert os.path.exists(path)
-
-    # 4. Restore via OS
-    sos.reset_engine()
-    sos.restore_snapshot(path)
-    assert get_world_state().metrics.total_records_processed > 0
-
-    os.remove(path)

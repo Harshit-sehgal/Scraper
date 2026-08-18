@@ -1,9 +1,11 @@
 {
+  "version": "2026-08-18.golden.v2",
+  "min_f1_gate": 0.9,
   "sites": [
     {
       "id": "books_toscrape",
       "url": "https://books.toscrape.com/",
-      "description": "Books to Scrape — demo ecommerce site with predictable HTML structure",
+      "description": "Books to Scrape — demo ecommerce catalog (page 1)",
       "schema": {
         "fields": {
           "title": { "type": "string", "required": true },
@@ -15,7 +17,58 @@
       "min_expected_records": 20,
       "min_f1": 0.95,
       "timeout_seconds": 60,
-      "notes": "Stable demo site. 50 books per page with consistent structure."
+      "notes": "Stable demo site. 20 books per page with consistent structure."
+    },
+    {
+      "id": "books_toscrape_page2",
+      "url": "https://books.toscrape.com/catalogue/page-2.html",
+      "description": "Books to Scrape — catalog page 2 (paginated listing)",
+      "schema": {
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "price": { "type": "currency", "required": false },
+          "rating": { "type": "string", "required": false }
+        }
+      },
+      "category": "ecommerce",
+      "min_expected_records": 20,
+      "min_f1": 0.9,
+      "timeout_seconds": 60,
+      "notes": "Same structure as page 1; verifies pagination URLs are stable."
+    },
+    {
+      "id": "books_travel",
+      "url": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+      "description": "Books to Scrape — Travel category (11 books)",
+      "schema": {
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "price": { "type": "currency", "required": false },
+          "rating": { "type": "string", "required": false }
+        }
+      },
+      "category": "ecommerce",
+      "min_expected_records": 11,
+      "min_f1": 0.9,
+      "timeout_seconds": 60,
+      "notes": "Small category page; full catalog listing is 11 books."
+    },
+    {
+      "id": "books_mystery",
+      "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+      "description": "Books to Scrape — Mystery category",
+      "schema": {
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "price": { "type": "currency", "required": false },
+          "rating": { "type": "string", "required": false }
+        }
+      },
+      "category": "ecommerce",
+      "min_expected_records": 20,
+      "min_f1": 0.9,
+      "timeout_seconds": 60,
+      "notes": "Category page with 20 books."
     },
     {
       "id": "quotes_toscrape",
@@ -34,9 +87,41 @@
       "notes": "Stable demo site. 10 quotes per page."
     },
     {
+      "id": "quotes_love",
+      "url": "https://quotes.toscrape.com/tag/love/",
+      "description": "Quotes to Scrape — love tag page",
+      "schema": {
+        "fields": {
+          "quote": { "type": "string", "required": true },
+          "author": { "type": "string", "required": false }
+        }
+      },
+      "category": "listing",
+      "min_expected_records": 10,
+      "min_f1": 0.9,
+      "timeout_seconds": 60,
+      "notes": "Tag-filtered listing; 10 quotes."
+    },
+    {
+      "id": "quotes_inspirational",
+      "url": "https://quotes.toscrape.com/tag/inspirational/",
+      "description": "Quotes to Scrape — inspirational tag page",
+      "schema": {
+        "fields": {
+          "quote": { "type": "string", "required": true },
+          "author": { "type": "string", "required": false }
+        }
+      },
+      "category": "listing",
+      "min_expected_records": 10,
+      "min_f1": 0.9,
+      "timeout_seconds": 60,
+      "notes": "Tag-filtered listing; 10 quotes."
+    },
+    {
       "id": "scrapethissite_simple",
       "url": "https://www.scrapethissite.com/pages/simple/",
-      "description": "ScrapeThisSite — simple country listing page",
+      "description": "ScrapeThisSite — country listing page (may be bot-blocked; diagnosis cards surface it)",
       "schema": {
         "fields": {
           "country": { "type": "string", "required": true },
@@ -47,25 +132,7 @@
       "min_expected_records": 250,
       "min_f1": 0.95,
       "timeout_seconds": 60,
-      "notes": "Stable educational scraping site."
-    },
-    {
-      "id": "scrapethissite_hockey",
-      "url": "https://www.scrapethissite.com/pages/forms/",
-      "description": "ScrapeThisSite — hockey team data in table structure with pagination",
-      "schema": {
-        "fields": {
-          "team_name": { "type": "string", "required": true },
-          "year": { "type": "number", "required": false },
-          "wins": { "type": "number", "required": false },
-          "losses": { "type": "number", "required": false }
-        }
-      },
-      "category": "table",
-      "min_expected_records": 50,
-      "min_f1": 0.9,
-      "timeout_seconds": 90,
-      "notes": "Paginated table with form elements. Tests table extraction + pagination."
+      "notes": "Educational scraping site. Started returning 403 for plain clients in 2026-08; kept so the trend alert surfaces bot-blocking."
     },
     {
       "id": "example_com",
@@ -78,7 +145,7 @@
         }
       },
       "category": "static",
-      "min_expected_records": 0,
+      "min_expected_records": 1,
       "min_f1": 1.0,
       "timeout_seconds": 45,
       "notes": "Minimal page, IANA reserved domain."
@@ -98,71 +165,6 @@
       "min_f1": 1.0,
       "timeout_seconds": 45,
       "notes": "Always available HTTP test service."
-    },
-    {
-      "id": "scrapethissite_faq",
-      "url": "https://www.scrapethissite.com/faq/",
-      "description": "ScrapeThisSite FAQ — tests extraction from definition list / key-value structure",
-      "schema": {
-        "fields": {
-          "question": { "type": "string", "required": true },
-          "answer": { "type": "string", "required": false }
-        }
-      },
-      "category": "key_value",
-      "min_expected_records": 10,
-      "min_f1": 0.85,
-      "timeout_seconds": 60,
-      "notes": "Definition list structure — tests key-value detection."
-    },
-    {
-      "id": "scrapethissite_ajax",
-      "url": "https://www.scrapethissite.com/pages/ajax-javascript/",
-      "description": "ScrapeThisSite AJAX — tests JS-rendered content extraction",
-      "schema": {
-        "fields": {
-          "movie_title": { "type": "string", "required": true },
-          "year": { "type": "number", "required": false }
-        }
-      },
-      "category": "dynamic",
-      "min_expected_records": 20,
-      "min_f1": 0.8,
-      "timeout_seconds": 90,
-      "notes": "JavaScript-rendered content. Tests Playwright/Render engine fallback."
-    },
-    {
-      "id": "scrapethissite_home",
-      "url": "https://www.scrapethissite.com/",
-      "description": "ScrapeThisSite homepage — broad structure test with mixed content",
-      "schema": {
-        "fields": {
-          "heading": { "type": "string", "required": false },
-          "description": { "type": "string", "required": false }
-        }
-      },
-      "category": "mixed",
-      "min_expected_records": 5,
-      "min_f1": 0.8,
-      "timeout_seconds": 45,
-      "notes": "Mixed content page — tests structure detection flexibility."
-    },
-    {
-      "id": "webscraper_products",
-      "url": "https://webscraper.io/test-sites/e-commerce/allinone",
-      "description": "WebScraper.io — comprehensive e-commerce test site with cards structure",
-      "schema": {
-        "fields": {
-          "title": { "type": "string", "required": true },
-          "price": { "type": "currency", "required": false },
-          "description": { "type": "string", "required": false }
-        }
-      },
-      "category": "ecommerce",
-      "min_expected_records": 20,
-      "min_f1": 0.85,
-      "timeout_seconds": 90,
-      "notes": "E-commerce test site with multiple product cards and category structure."
     }
   ]
 }

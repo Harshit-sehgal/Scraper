@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 import pytest
+from app.golden_corpus import DROP_ALERT_POINTS, record_trend, write_diagnosis_card
 from app.models import FieldType, SchemaField
 
 GOLDEN_DATASET_DIR = Path(__file__).resolve().parent / "golden_dataset"
@@ -217,12 +218,35 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
     if expected:
         key_fields = list(fields_def.keys())[:2]  # First 2 fields as key
         f1_result = compute_f1(results, expected, key_fields=key_fields)
-        # Log but don't fail — golden dataset thresholds are being refined
         min_f1 = site_def.get("min_f1")
         assert min_f1 is not None, f"{site_id}: expected output exists but min_f1 is not configured"
-        assert f1_result["f1"] >= float(
-            min_f1,
-        ), f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f}"
+
+        # E3.3: record the observation and alert on a >5pt regression vs
+        # the previous run of the same site (trend.jsonl is committed).
+        trend = record_trend(site_id, f1_result["f1"])
+        drop_points = trend["drop"] * 100
+        if drop_points > DROP_ALERT_POINTS:
+            pytest.fail(
+                f"ACCURACY REGRESSION for {site_id}: F1 {f1_result['f1']:.3f} is {drop_points:.1f}pt "
+                f"below the previous run ({trend['previous_f1']:.3f}) — exceeds the "
+                f"{DROP_ALERT_POINTS:g}pt alert threshold",
+            )
+
+        # E3.2: below-threshold sites produce a diagnosis card (failure
+        # taxonomy + field-level F1), never a silent red.
+        if f1_result["f1"] < float(min_f1):
+            card_path = write_diagnosis_card(
+                site_id=site_id,
+                url=url,
+                f1_result=f1_result,
+                fields=list(fields_def.keys()),
+                extracted=results,
+                expected=expected,
+            )
+            pytest.fail(
+                f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f} "
+                f"— diagnosis card written to {card_path}",
+            )
     else:
         pass
 
@@ -233,6 +257,14 @@ def test_golden_dataset_sites_file_exists() -> None:
     assert SITES_FILE.exists(), f"Sites file not found: {SITES_FILE}"
     sites = load_sites()
     assert len(sites) > 0, "No sites defined in golden dataset"
+    # E3.1 gate: at least 10 sites, each with expected output and a min_f1.
+    assert len(sites) >= 10, f"E3.1 requires >= 10 sites, found {len(sites)}"
+    with open(SITES_FILE) as f:
+        meta = json.load(f)
+    assert meta.get("version"), "E3.1: sites.json must be versioned"
+    for site in sites:
+        assert load_expected(site["id"]) is not None, f"{site['id']}: missing expected output file"
+        assert site.get("min_f1") is not None, f"{site['id']}: missing min_f1"
 
 
 @pytest.mark.golden_dataset

@@ -22,13 +22,13 @@
 | `docs/AGENT_TRUTH.md` | **Rewrite** | Stale test counts (says 1,884 vs actual 2,207), false pass claims |
 | `docs/ARCHITECTURE.md` | **Keep** (minor fixes) | Largely accurate, may need minor updates |
 | `docs/API.md` | **Keep** | Documented routes match actual routes |
-| `docs/SETUP.md` | **Keep** | Setup instructions appear accurate |
+| `docs/archive/SETUP.md` | **Keep** | Setup instructions appear accurate |
 | `docs/PRODUCTION.md` | **Keep** (minor fixes) | Production doc needs stale claim fixes |
-| `docs/PRODUCTION_STARTUP.md` | **Keep** | Startup guide is accurate |
+| `docs/archive/PRODUCTION_STARTUP.md` | **Keep** | Startup guide is accurate |
 | `docs/SECURITY.md` | **Keep** (already fixed) | CSP section updated in previous session |
 | `docs/LIMITATIONS.md` | **Keep** | Limitations are honest and accurate |
-| `docs/HANDOFF.md` | **Archive** | Historical handoff document |
-| `docs/AUDIT_INDEX.md` | **Keep** | Navigation index for audit deliverables |
+| `docs/archive/HANDOFF.md` | **Archive** | Historical handoff document |
+| `docs/archive/AUDIT_INDEX.md` | **Keep** | Navigation index for audit deliverables |
 | `docs/audit/DELIVERABLE_*.md` | **Keep** | These are the current audit deliverables |
 | `docs/archive/` | **Review** | 12 files — see below |
 

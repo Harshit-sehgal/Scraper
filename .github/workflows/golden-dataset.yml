@@ -51,6 +51,16 @@ jobs:
           python -m pytest -v backend/tests/test_golden_dataset.py --run-golden-dataset -o addopts= \
           --tb=short --reruns 3 --reruns-delay 10
 
+      - name: Publish accuracy artifacts
+        if: always()
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4a58bb5c2f3 # v4
+        with:
+          name: golden-dataset-artifacts
+          path: |
+            backend/tests/golden_dataset/trend.jsonl
+            artifacts/golden_dataset/diagnosis/
+          if-no-files-found: ignore
+
   notify:
     name: Telegram Notification
     needs: [golden-dataset]

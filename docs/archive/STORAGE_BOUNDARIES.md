@@ -32,7 +32,7 @@ the storage parity/repository/integration suite passed with
 
 ## Current Source-Of-Truth Model
 
-See `docs/STATE_MODEL.md` for historical in-memory-vs-persistent-store notes. Current high-level behavior:
+See `docs/archive/STATE_MODEL.md` for historical in-memory-vs-persistent-store notes. Current high-level behavior:
 
 - Single-process API paths often read from in-memory stores.
 - Worker mode and targeted read paths can refresh from the repository.

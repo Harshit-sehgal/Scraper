@@ -124,7 +124,7 @@ _scheduled_job_ops_lock = threading.Lock()
 _retention_ops: dict[str, int] = {}
 _retention_ops_lock = threading.Lock()
 
-# Product-level counters aligned with docs/OBSERVABILITY.md required metrics.
+# Product-level counters aligned with docs/archive/OBSERVABILITY.md required metrics.
 _product_totals: dict[str, int] = {}
 _product_totals_lock = threading.Lock()
 

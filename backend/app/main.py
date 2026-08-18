@@ -27,9 +27,11 @@ from app.logging_config import configure_logging as _configure_logging
 _configure_logging()
 
 from app.billing.checkout import router as billing_checkout_router
+from app.billing.dodo import router as billing_dodo_router
 from app.billing.webhooks import router as billing_webhook_router
 from app.config import settings
 from app.globals import CONFIG, jobs_store, recycle_bin_store
+from app.legal.router import router as legal_router
 from app.lifespan import (
     lifespan,
     persist_single_wrapper,
@@ -235,6 +237,8 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(gdpr_compliance_router)
     app.include_router(billing_webhook_router)
     app.include_router(billing_checkout_router)
+    app.include_router(billing_dodo_router)
+    app.include_router(legal_router)
 
     # Experimental / research routes — gated on the same flag that gates
     # the import-time subsystem initialization. Including this router

@@ -140,7 +140,7 @@ Prompt 9 adds fixture-backed field detection, manual mapping, bounded
 snapshot preview, timeline output, and a visible frontend Workflow
 Builder draft panel. Full live Playwright navigation from arbitrary
 start URLs remains a documented Workflow Replay gap; see
-`docs/WORKFLOW_REPLAY.md`.
+`docs/archive/WORKFLOW_REPLAY.md`.
 
 ## Evidence
 

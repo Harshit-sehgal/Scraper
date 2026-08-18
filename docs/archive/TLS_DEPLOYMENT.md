@@ -100,5 +100,5 @@ Expected results:
 * Not a substitute for the upstream nginx docs.
 * Not a renewal policy — see `docs/INCIDENT_RUNBOOK.md` for the
   rotation procedure.
-* Not a CSP review — see `docs/DASHBOARD_AUTH.md` for the
+* Not a CSP review — see `docs/archive/DASHBOARD_AUTH.md` for the
   Content-Security-Policy plan.

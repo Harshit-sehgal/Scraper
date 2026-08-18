@@ -100,8 +100,7 @@ def _format_text_report(report: dict[str, Any]) -> str:
     lines = [
         "Anti-Bot Detection Benchmark",
         "============================",
-        f"Overall: {report.get('overall', 'UNKNOWN')}     "
-        f"Score: {report.get('checks_result', {}).get('score', 0)}",
+        f"Overall: {report.get('overall', 'UNKNOWN')}     Score: {report.get('checks_result', {}).get('score', 0)}",
         "",
     ]
     summary = report.get("checks_result", {}).get("summary", {})

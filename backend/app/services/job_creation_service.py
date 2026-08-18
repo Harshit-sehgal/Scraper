@@ -156,10 +156,11 @@ class JobCreationService:
         2. Validate and sanitize URLs
         3. M2: Check semantic mode availability if required
         4. Handle idempotency key (replay or reject conflicts)
-        5. Build and persist the Job object
-        6. Record usage in the ledger
-        7. Enqueue or schedule the job for execution
-        8. Return the result
+        5. Hard-stop: page-fetch budget vs plan quota (PRD §4)
+        6. Build and persist the Job object
+        7. Record usage in the ledger
+        8. Enqueue or schedule the job for execution
+        9. Return the result
         """
         # Step 1: Resolve identity and tenant context
         user_id, owner_org_id, owner_project_id = self._resolve_identity(request)
@@ -190,13 +191,22 @@ class JobCreationService:
             if replay is not None:
                 return replay
 
-        # Step 4: Build the Job
+        # Step 4: Hard-stop on the billed dimension (PRD §4). Reject at
+        # creation when the job's upper-bound page-fetch cost exceeds the
+        # remaining PAGE_FETCHED quota; without this a user burns quota
+        # mid-run and the job dies silently. Auto-mode jobs resolve their
+        # URL list at runtime, so their cost is unknown here and the
+        # runtime per-page check in ``app.services.scraping`` remains
+        # their cap.
+        self._check_page_fetch_budget(job_data, urls, user_id, owner_org_id, owner_project_id)
+
+        # Step 5: Build the Job
         job = self._build_job(job_data, urls, user_id, owner_org_id, owner_project_id)
 
-        # Step 5: Record usage
+        # Step 6: Record usage
         self._record_usage(user_id, job.id, idem_key, owner_org_id, owner_project_id)
 
-        # Step 6: Persist
+        # Step 7: Persist
         with self._manager.lock:
             self._manager.jobs_store[job.id] = job
         await save_job(job)
@@ -208,12 +218,12 @@ class JobCreationService:
         except ImportError as exc:
             logger.debug("Optional metrics collector not available: %s", exc)
 
-        # Step 7: Record idempotency key
+        # Step 8: Record idempotency key
         if idem_key:
             fingerprint = canonical_request_fingerprint(job_data)
             await run_in_threadpool(record_idempotency_key, idem_key, job.id, fingerprint)
 
-        # Step 8: Schedule
+        # Step 9: Schedule
         await self._schedule_execution(job.id, user_id, owner_org_id, owner_project_id)
 
         return JobCreationResult(
@@ -300,6 +310,58 @@ class JobCreationService:
             status="unknown",
             idempotent_replay=True,
         )
+
+    def _estimate_page_fetch_cost(self, job_data: JobCreate, urls: list[str]) -> int:
+        """Upper-bound page fetches for this job at creation time.
+
+        Manual jobs fetch at most ``max_pages`` pages per URL (see
+        ``app.models.jobs.JobCreate.max_pages`` — "Max pages to follow
+        per URL"), so the upper bound is ``len(urls) * max_pages``.
+        Auto-mode jobs resolve their URL list at runtime; their cost is
+        unknown at creation time and this returns 0 (no hard-stop; the
+        runtime per-page quota check in ``app.services.scraping`` is
+        their cap).
+        """
+        if job_data.mode != ScrapeMode.MANUAL:
+            return 0
+        per_url = max(1, int(job_data.max_pages or 1))
+        return max(1, len(urls)) * per_url
+
+    def _check_page_fetch_budget(
+        self,
+        job_data: JobCreate,
+        urls: list[str],
+        user_id: str,
+        org_id: str,
+        project_id: str,
+    ) -> None:
+        """Reject job creation when the estimated page-fetch cost exceeds
+        the remaining PAGE_FETCHED quota (PRD §4 hard-stop)."""
+        estimated = self._estimate_page_fetch_cost(job_data, urls)
+        if estimated <= 0:
+            return
+
+        from app.plan_enforcer import check_usage_limit
+
+        quota_owner = org_id or project_id or user_id
+        allowed, details = check_usage_limit(
+            quota_owner,
+            UsageType.PAGE_FETCHED,
+            quantity=estimated,
+            org_id=org_id,
+            project_id=project_id,
+        )
+        if not allowed:
+            remaining = details.get("remaining")
+            raise UsageQuotaExceededError(
+                detail=(
+                    f"Plan limit exceeded for page_fetched. "
+                    f"This job requires up to {estimated} page fetches but "
+                    f"only {remaining if remaining is not None else 0} remain "
+                    f"({details.get('period', 'monthly')}). "
+                    "Upgrade your plan to continue."
+                )
+            )
 
     def _build_job(
         self,
