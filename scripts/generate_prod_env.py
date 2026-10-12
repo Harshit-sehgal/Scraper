@@ -78,6 +78,15 @@ DATAFORGE_OPERATOR_API_KEY_FILE=./.secrets/dataforge_operator_api_key
 DATAFORGE_ADMIN_API_KEY_FILE=./.secrets/dataforge_admin_api_key
 DATAFORGE_SESSION_SECRET_FILE=./.secrets/dataforge_session_secret
 
+# Active billing provider (fill these provider values manually).
+DODO_PAYMENTS_API_KEY=CHANGE_ME_DODO_LIVE_API_KEY
+DODO_PAYMENTS_ENVIRONMENT=live_mode
+DODO_PAYMENTS_WEBHOOK_KEY=CHANGE_ME_DODO_STANDARD_WEBHOOK_KEY
+DODO_PRODUCT_ID_STARTER=CHANGE_ME_DODO_STARTER_PRODUCT_ID
+DODO_PRODUCT_ID_PRO=CHANGE_ME_DODO_PRO_PRODUCT_ID
+DODO_PRODUCT_ID_ENTERPRISE=CHANGE_ME_DODO_ENTERPRISE_PRODUCT_ID
+DODO_CHECKOUT_RETURN_URL=https://yourdomain.com/app/?dodo_return=1
+
 # Metrics scrape token for Prometheus scraping
 DATAFORGE_METRICS_TOKEN={metrics_token}
 

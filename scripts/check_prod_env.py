@@ -281,6 +281,22 @@ def check_worker_queue(value: str) -> bool:
     return True
 
 
+def check_protection_bypass_disabled(value: str) -> bool:
+    """Reject production flags that would bypass access challenges.
+
+    DataForge must not solve CAPTCHAs or harvest Cloudflare clearance
+    cookies. Protected pages are reported and left for authorized human
+    intervention instead of being bypassed automatically.
+    """
+    if value.strip().lower() in ("true", "1", "yes", "on"):
+        print(
+            "  [FAIL]  CAPTCHA solver and challenge-harvesting integrations must remain disabled in production. "
+            "DataForge does not bypass access controls."
+        )
+        return False
+    return value.strip().lower() in ("false", "0", "no", "off")
+
+
 def check_queue_backend(value: str) -> bool:
     """Validate DATAFORGE_QUEUE_BACKEND is 'postgres'."""
     if value.lower() != "postgres":
@@ -424,6 +440,29 @@ def check_paypal_plan_id(value: str, name: str) -> bool:
 def check_paypal_webhook_secret(value: str) -> bool:
     if not value or _is_placeholder_secret(value):
         print("  [FAIL]  PAYPAL_WEBHOOK_SECRET is not set or is a placeholder. Production requires a real webhook secret.")
+        return False
+    return True
+
+
+def check_dodo_secret(value: str, name: str) -> bool:
+    """Reject missing/placeholder Dodo credentials without assuming a format."""
+    if not value or _is_placeholder_secret(value):
+        print(f"  [FAIL]  {name} is not set or is a placeholder. Production requires a real Dodo credential.")
+        return False
+    return True
+
+
+def check_dodo_environment(value: str) -> bool:
+    if value.strip().lower() != "live_mode":
+        print("  [FAIL]  DODO_PAYMENTS_ENVIRONMENT must be 'live_mode' for production.")
+        return False
+    return True
+
+
+def check_dodo_return_url(value: str) -> bool:
+    parsed = urlsplit(value)
+    if parsed.scheme != "https" or not parsed.netloc:
+        print("  [FAIL]  DODO_CHECKOUT_RETURN_URL must be an absolute HTTPS URL.")
         return False
     return True
 
@@ -692,6 +731,18 @@ def main() -> int:
         ("DATAFORGE_DATABASE_URL", True, check_database_url, "Must be a postgresql:// URL matching docker-compose.prod.yml"),
         ("DATAFORGE_WORKER_QUEUE", True, check_worker_queue, "Must be 'true' for production"),
         (
+            "DATAFORGE_CAPTCHA_SOLVER_ENABLED",
+            False,
+            check_protection_bypass_disabled,
+            "Must be false or unset; protected pages fail closed and require authorized human intervention",
+        ),
+        (
+            "DATAFORGE_CF_HARVESTER_ENABLED",
+            False,
+            check_protection_bypass_disabled,
+            "Must be false or unset; DataForge does not harvest challenge-clearance cookies",
+        ),
+        (
             "DATAFORGE_QUEUE_BACKEND",
             True,
             check_queue_backend,
@@ -741,40 +792,46 @@ def main() -> int:
             "Production supports the single default Grafana admin username: admin",
         ),
         (
-            "PAYPAL_CLIENT_ID",
+            "DODO_PAYMENTS_API_KEY",
             True,
-            check_paypal_client_id,
-            "Live PayPal REST client ID for checkout and webhook verification",
+            lambda v: check_dodo_secret(v, "DODO_PAYMENTS_API_KEY"),
+            "Live Dodo Payments API key for hosted checkout",
         ),
         (
-            "PAYPAL_CLIENT_SECRET",
+            "DODO_PAYMENTS_ENVIRONMENT",
             True,
-            check_paypal_client_id,
-            "Live PayPal REST client secret",
+            check_dodo_environment,
+            "Must be live_mode for production billing",
         ),
         (
-            "PAYPAL_PLAN_ID_STARTER",
+            "DODO_PAYMENTS_WEBHOOK_KEY",
             True,
-            lambda v: check_paypal_plan_id(v, "PAYPAL_PLAN_ID_STARTER"),
-            "PayPal subscription plan ID for the Starter tier",
+            lambda v: check_dodo_secret(v, "DODO_PAYMENTS_WEBHOOK_KEY"),
+            "Dodo Standard-Webhooks signing secret",
         ),
         (
-            "PAYPAL_PLAN_ID_PRO",
+            "DODO_PRODUCT_ID_STARTER",
             True,
-            lambda v: check_paypal_plan_id(v, "PAYPAL_PLAN_ID_PRO"),
-            "PayPal subscription plan ID for the Pro tier",
+            lambda v: check_dodo_secret(v, "DODO_PRODUCT_ID_STARTER"),
+            "Dodo product ID for Starter",
         ),
         (
-            "PAYPAL_PLAN_ID_ENTERPRISE",
+            "DODO_PRODUCT_ID_PRO",
             True,
-            lambda v: check_paypal_plan_id(v, "PAYPAL_PLAN_ID_ENTERPRISE"),
-            "PayPal subscription plan ID for the Enterprise tier",
+            lambda v: check_dodo_secret(v, "DODO_PRODUCT_ID_PRO"),
+            "Dodo product ID for Pro",
         ),
         (
-            "PAYPAL_WEBHOOK_SECRET",
+            "DODO_PRODUCT_ID_ENTERPRISE",
             True,
-            check_paypal_webhook_secret,
-            "PayPal webhook signing secret for event verification",
+            lambda v: check_dodo_secret(v, "DODO_PRODUCT_ID_ENTERPRISE"),
+            "Dodo product ID for Enterprise",
+        ),
+        (
+            "DODO_CHECKOUT_RETURN_URL",
+            True,
+            check_dodo_return_url,
+            "Absolute HTTPS return URL for Dodo checkout",
         ),
         (
             "DATAFORGE_IMAGE_TAG",

@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 
 import pytest
-from app.golden_corpus import DROP_ALERT_POINTS, record_trend, write_diagnosis_card
+from app.golden_corpus import DROP_ALERT_POINTS, field_level_f1, record_trend, write_diagnosis_card
 from app.models import FieldType, SchemaField
 
 GOLDEN_DATASET_DIR = Path(__file__).resolve().parent / "golden_dataset"
@@ -54,6 +54,7 @@ def compute_f1(
     extracted: list[dict],
     expected: list[dict],
     key_fields: list[str] | None = None,
+    fields: list[str] | None = None,
 ) -> dict:
     """Compute precision, recall, F1 between extracted and expected records.
 
@@ -62,20 +63,33 @@ def compute_f1(
 
     Returns dict with precision, recall, f1, and detail counts.
     """
+    key_fields = key_fields or ["title"]
+    fields = fields or key_fields
+
     if not expected:
-        return {"precision": 1.0, "recall": 1.0, "f1": 1.0, "true_positives": 0, "false_positives": 0, "false_negatives": 0}
+        return {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "field_f1": 1.0,
+            "field_metrics": {},
+            "true_positives": 0,
+            "false_positives": 0,
+            "false_negatives": 0,
+        }
 
     if not extracted:
+        field_metrics = field_level_f1(extracted, expected, fields, key_fields=key_fields)
         return {
             "precision": 0.0,
             "recall": 0.0,
             "f1": 0.0,
+            "field_f1": 0.0,
+            "field_metrics": field_metrics,
             "true_positives": 0,
             "false_positives": 0,
             "false_negatives": len(expected),
         }
-
-    key_fields = key_fields or ["title"]
 
     def record_key(rec: dict) -> str:
         for kf in key_fields:
@@ -108,10 +122,15 @@ def compute_f1(
     recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0.0
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
 
+    field_metrics = field_level_f1(extracted, expected, fields, key_fields=key_fields)
+    field_f1 = sum(float(metric["f1"]) for metric in field_metrics.values()) / len(field_metrics) if field_metrics else 0.0
+
     return {
         "precision": round(precision, 4),
         "recall": round(recall, 4),
         "f1": round(f1, 4),
+        "field_f1": round(field_f1, 4),
+        "field_metrics": field_metrics,
         "true_positives": true_positives,
         "false_positives": false_positives,
         "false_negatives": false_negatives,
@@ -216,14 +235,14 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
 
     # Compare with expected output if available
     if expected:
-        key_fields = list(fields_def.keys())[:2]  # First 2 fields as key
-        f1_result = compute_f1(results, expected, key_fields=key_fields)
+        key_fields = list(fields_def.keys())[:2]  # First 2 fields as identity candidates
+        f1_result = compute_f1(results, expected, key_fields=key_fields, fields=list(fields_def.keys()))
         min_f1 = site_def.get("min_f1")
         assert min_f1 is not None, f"{site_id}: expected output exists but min_f1 is not configured"
 
         # E3.3: record the observation and alert on a >5pt regression vs
         # the previous run of the same site (trend.jsonl is committed).
-        trend = record_trend(site_id, f1_result["f1"])
+        trend = record_trend(site_id, f1_result["field_f1"])
         drop_points = trend["drop"] * 100
         if drop_points > DROP_ALERT_POINTS:
             pytest.fail(
@@ -234,7 +253,8 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
 
         # E3.2: below-threshold sites produce a diagnosis card (failure
         # taxonomy + field-level F1), never a silent red.
-        if f1_result["f1"] < float(min_f1):
+        min_field_f1 = float(site_def.get("min_field_f1", min_f1))
+        if f1_result["f1"] < float(min_f1) or f1_result["field_f1"] < min_field_f1:
             card_path = write_diagnosis_card(
                 site_id=site_id,
                 url=url,
@@ -242,9 +262,11 @@ async def test_golden_dataset_site(site_def, monkeypatch) -> None:
                 fields=list(fields_def.keys()),
                 extracted=results,
                 expected=expected,
+                key_fields=key_fields,
             )
             pytest.fail(
-                f"{site_id}: F1 {f1_result['f1']:.3f} is below configured threshold {float(min_f1):.3f} "
+                f"{site_id}: record F1 {f1_result['f1']:.3f} / field F1 {f1_result['field_f1']:.3f} "
+                f"is below configured thresholds {float(min_f1):.3f}/{min_field_f1:.3f} "
                 f"— diagnosis card written to {card_path}",
             )
     else:

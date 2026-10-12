@@ -109,7 +109,14 @@ def _classify_route(path: str, method: str, roles: list[str]) -> tuple[str, str,
     if path in {"/api/session", "/api/session/me"}:
         return ("public", "exempt from API-key middleware", "Session self-service auth; separate cookie-based flow.")
 
-    if path == "/api/saas/signup":
+    if path in {
+        "/api/saas/signup",
+        "/api/saas/login",
+        "/api/saas/password-reset/request",
+        "/api/saas/password-reset/reset",
+        "/api/billing/webhook",
+        "/api/billing/dodo/webhook",
+    }:
         return ("public", "exempt from API-key middleware", "Self-service account signup.")
 
     if path.startswith("/api/"):

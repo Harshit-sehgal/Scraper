@@ -428,7 +428,7 @@ def _build_fetch_failure_result(
     from app.recovery_strategies import RecoveryAction
 
     fetch_ms = (time.time() - start_time) * 1000
-    logger.exception("Failed to fetch %s", url)
+    logger.error("Failed to fetch %s", url, exc_info=e)
 
     provenance_builder = ProvenanceBuilder(url, "")
     provenance_builder.add_error(f"Fetch failed: {e}")

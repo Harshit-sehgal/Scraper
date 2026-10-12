@@ -81,6 +81,7 @@ def _dodo_event(event_type: str, subscription_id: str, customer_id: str, product
         "data": {
             "subscription_id": subscription_id,
             "customer_id": customer_id,
+            "metadata": {"dataforge_user_id": customer_id},
             "product_id": product_id,
             "status": "active",
             "payment_frequency_interval": "monthly",

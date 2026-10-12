@@ -95,6 +95,9 @@ _EMAIL_VERIFICATION_CONFIRM_LIMITERS: dict[str, SlidingWindowCounter] = {}
 # Rate-limit state for signup (per-IP).
 _SIGNUP_LIMITERS: dict[str, SlidingWindowCounter] = {}
 
+# Rate-limit state for password login (per-IP).
+_LOGIN_LIMITERS: dict[str, SlidingWindowCounter] = {}
+
 
 def reset_rate_limiters() -> None:
     """Clear all in-memory rate limiter state.
@@ -108,6 +111,7 @@ def reset_rate_limiters() -> None:
     _INVITATION_CREATE_LIMITERS.clear()
     _EMAIL_VERIFICATION_CONFIRM_LIMITERS.clear()
     _SIGNUP_LIMITERS.clear()
+    _LOGIN_LIMITERS.clear()
 
 
 def _check_rate_limit(

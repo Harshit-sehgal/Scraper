@@ -43,6 +43,51 @@ class TestSignup:
         assert "project_id" in data
         assert "created successfully" in data["message"]
 
+    def test_signup_sets_authenticated_session_cookie(self, client: TestClient):
+        """A new customer must be able to continue into the app immediately."""
+        resp = client.post(
+            "/api/saas/signup",
+            json={"email": "activation@example.com", "password": "SecurePass123!"},
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.cookies.get("dataforge_session"), "signup must issue the browser session cookie"
+
+        session = client.get("/api/session/me", cookies=resp.cookies)
+        assert session.status_code == 200, session.text
+        assert session.json() == {
+            "authenticated": True,
+            "role": "user",
+            "user_id": resp.json()["user_id"],
+            "org_id": resp.json()["organization_id"],
+            "project_id": resp.json()["project_id"],
+        }
+
+    def test_login_sets_authenticated_session_cookie(self, client: TestClient):
+        """Returning customers can sign in with the password collected at signup."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "login@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201
+
+        resp = client.post(
+            "/api/saas/login",
+            json={"email": "LOGIN@example.com", "password": "SecurePass123!"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.cookies.get("dataforge_session")
+        session = client.get("/api/session/me", cookies=resp.cookies)
+        assert session.status_code == 200
+        assert session.json()["user_id"] == signup.json()["user_id"]
+
+    def test_login_rejects_invalid_credentials_without_account_signal(self, client: TestClient):
+        resp = client.post(
+            "/api/saas/login",
+            json={"email": "missing@example.com", "password": "WrongPass123!"},
+        )
+        assert resp.status_code == 401
+        assert resp.json()["detail"] == "Invalid email or password."
+
     def test_signup_duplicate_email_fails(self, client: TestClient):
         # First signup
         resp = client.post(
@@ -359,6 +404,87 @@ class TestAupEnforcementOnMutationRoutes:
         )
         assert resp.status_code == 403
         assert "Acceptable Use Policy" in resp.json()["detail"]
+
+    def test_create_scheduled_job_succeeds_for_aup_user(self, client: TestClient):
+        """A tenant user, not only an operator, can activate the core wedge."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "user-sched@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+        from app.saas import CURRENT_AUP_VERSION
+        from app.saas.identity_store import get_identity_store
+
+        get_identity_store().mark_aup_accepted(user_id, aup_version=CURRENT_AUP_VERSION)
+        cookies = {
+            SESSION_COOKIE: create_session_cookie(
+                "user",
+                user_id,
+                org_id=signup.json()["organization_id"],
+                project_id=signup.json()["project_id"],
+            ),
+        }
+        resp = client.post(
+            "/api/scheduled?name=User+Schedule&job_name=User+Run&urls=https://example.com/",
+            cookies=cookies,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["user_id"] == user_id
+
+    def test_create_job_requires_aup_for_tenant_user(self, client: TestClient):
+        """The direct job-creation wedge must share the AUP gate."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "noaup-job@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+
+        cookies = {
+            SESSION_COOKIE: create_session_cookie(
+                "user",
+                signup.json()["user_id"],
+                org_id=signup.json()["organization_id"],
+                project_id=signup.json()["project_id"],
+            ),
+        }
+        resp = client.post(
+            "/api/jobs",
+            json={"name": "No AUP job", "mode": "manual", "urls": ["https://example.com"]},
+            cookies=cookies,
+        )
+        assert resp.status_code == 403
+        assert "Acceptable Use Policy" in resp.json()["detail"]
+
+    def test_create_job_succeeds_for_aup_user(self, client: TestClient):
+        signup = client.post(
+            "/api/saas/signup",
+            json={"email": "user-job@example.com", "password": "SecurePass123!"},
+        )
+        assert signup.status_code == 201
+        user_id = signup.json()["user_id"]
+        from app.auth.session import SESSION_COOKIE, create_session_cookie
+        from app.saas import CURRENT_AUP_VERSION
+        from app.saas.identity_store import get_identity_store
+
+        get_identity_store().mark_aup_accepted(user_id, aup_version=CURRENT_AUP_VERSION)
+        cookies = {
+            SESSION_COOKIE: create_session_cookie(
+                "user",
+                user_id,
+                org_id=signup.json()["organization_id"],
+                project_id=signup.json()["project_id"],
+            ),
+        }
+        resp = client.post(
+            "/api/jobs",
+            json={"name": "User job", "mode": "manual", "urls": ["https://example.com"]},
+            cookies=cookies,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["job_id"]
 
     def test_create_api_key_succeeds_with_aup(self, client: TestClient):
         """Creating an API key must succeed after AUP acceptance."""

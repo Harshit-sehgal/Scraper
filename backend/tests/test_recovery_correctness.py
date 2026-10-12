@@ -260,6 +260,17 @@ async def test_crawl_policy_active_counter_never_leaks_on_fetch_failure(monkeypa
     policy.reset_domain("https://example.com/fail-fetch")
     monkeypatch.setattr(policy, "_respect_robots", False)
 
+    # Disable selector-profile routing so the monkeypatched fetch below is the
+    # only fetch path. ``_try_profile_extraction`` calls the profile extractor
+    # unconditionally, and that extractor performs a real network fetch when a
+    # profile matches; without this the simulated failure never fires.
+    monkeypatch.setattr(scraper, "match_profile_for_url", lambda url: None)
+
+    async def fake_profile(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(scraper, "try_profile_extraction", fake_profile)
+
     # Assert initial state
     assert policy._domains["example.com"].active_fetches == 0
 

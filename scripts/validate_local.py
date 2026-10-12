@@ -386,9 +386,7 @@ def preflight_result() -> dict[str, Any]:
     if missing:
         stdout = (
             "Missing pytest plugins required by pyproject.toml addopts.\n"
-            "Run: pip install "
-            + " ".join(missing)
-            + "\n(Dev extras include these:  pip install -e '.[dev]')"
+            "Run: pip install " + " ".join(missing) + "\n(Dev extras include these:  pip install -e '.[dev]')"
         )
         return internal_result("preflight", "not_installed", stdout, note=stdout)
     return internal_result("preflight", "passed", "All required pytest plugins importable.")
@@ -511,10 +509,28 @@ def selected_mode(args: argparse.Namespace) -> str:
     return "quick"
 
 
+def _resolve_interpreter() -> str:
+    """Prefer the project's pinned virtualenv when one exists.
+
+    The gate must run against the dependencies declared in ``pyproject.toml``
+    (and ``uv.lock``). A stray system interpreter can carry drifted tool
+    versions (ruff/mypy/pytest/playwright) and produce results that do not
+    match CI. Set ``DATAFORGE_VALIDATE_PYTHON`` to override; otherwise fall
+    back to the running interpreter when no project venv exists (e.g. CI).
+    """
+    override = os.environ.get("DATAFORGE_VALIDATE_PYTHON")
+    if override:
+        return override
+    venv_python = ROOT / ".venv" / "bin" / "python"
+    if venv_python.exists():
+        return str(venv_python)
+    return sys.executable
+
+
 def main() -> int:
     args = parse_args()
     mode = selected_mode(args)
-    py = sys.executable
+    py = _resolve_interpreter()
     progress_stream = sys.stderr if args.json else sys.stdout
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + f"_{mode}"
     archive_dir = RUNS_DIR / run_id

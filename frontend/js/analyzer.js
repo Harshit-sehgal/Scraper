@@ -193,7 +193,7 @@ export async function analyzeURL() {
     const res = await apiFetch(endpoints.urlAnalyze, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, fetch_preview: false }),
+      body: JSON.stringify({ url, fetch_preview: true }),
       signal: controller.signal,
     });
 

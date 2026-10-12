@@ -228,6 +228,11 @@ def http_request(
     except urllib.error.HTTPError as exc:
         body = exc.read(1_000_000).decode("utf-8", errors="replace")
         return HttpResult(status_code=exc.code, body=body)
+    except (OSError, urllib.error.URLError) as exc:
+        # Keep the CLI structured when Alertmanager is unavailable. A
+        # connection refusal is an expected operational failure mode, not a
+        # reason to emit a traceback that hides the drill result.
+        return HttpResult(status_code=0, body=f"{type(exc).__name__}: {exc}")
 
 
 def validate_slack_channel_reachable(

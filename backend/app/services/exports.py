@@ -101,6 +101,11 @@ def resolve_fieldnames(job: Job, results_list: list[dict]) -> list[str]:
     return user_fieldnames(results_list)
 
 
+def project_row(row: dict[str, Any], fieldnames: list[str]) -> dict[str, Any]:
+    """Project a result row onto the user-visible export fields in schema order."""
+    return {field: row.get(field) for field in fieldnames}
+
+
 # ════════════════════════════════════════════════════════════════════
 # CSV (single job)
 # ════════════════════════════════════════════════════════════════════
@@ -184,7 +189,9 @@ def build_json_bytes(job: Job) -> bytes:
     if not job.results:
         msg = "No results to export"
         raise ValueError(msg)
-    cleaned = strip_system_fields(list(job.results))
+    results_list = list(job.results)
+    fieldnames = resolve_fieldnames(job, results_list)
+    cleaned = [project_row(row, fieldnames) for row in results_list]
     return json.dumps(cleaned, indent=2).encode("utf-8")
 
 
@@ -204,9 +211,10 @@ async def stream_json_from_disk(
         msg = "No results to export"
         raise ValueError(msg)
 
+    fieldnames = resolve_fieldnames(job, first_page)
     yield b"[\n"
     for i, row in enumerate(first_page):
-        cleaned = strip_system_fields([row])[0]
+        cleaned = project_row(row, fieldnames)
         prefix = "  " if i == 0 else ",  "
         yield (prefix + json.dumps(cleaned, indent=2).replace("\n", "\n  ") + "\n").encode("utf-8")
 
@@ -223,7 +231,7 @@ async def stream_json_from_disk(
         if not page:
             break
         for row in page:
-            cleaned = strip_system_fields([row])[0]
+            cleaned = project_row(row, fieldnames)
             prefix = ",  " if idx > 0 else "  "
             yield (prefix + json.dumps(cleaned, indent=2).replace("\n", "\n  ") + "\n").encode("utf-8")
             idx += 1

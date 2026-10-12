@@ -1,8 +1,8 @@
 # Agent Truth - DataForge Scraper
 
-_Truth source current as of 2026-07-05 local time from the working tree._
-_The most recent session (2026-07-04 CSRF / Rate-Limit / ReDoS / Crypto) is the
-focus entry below — see "Session 93 - CSRF + Rate-Limit + ReDoS + Crypto"._
+_Truth source current as of 2026-10-08 local time from the working tree._
+_The most recent session is the production-readiness reconciliation and
+environment repair entry below — see "Session 113"._
 
 This file is an index to fresh command evidence, not proof by itself.
 Reproduce commands or inspect the cited logs before relying on any claim.
@@ -10,6 +10,807 @@ Reproduce commands or inspect the cited logs before relying on any claim.
 This file is the starting point for future agents. Treat older status
 documents and archived plans as historical unless their claims are
 reproduced by current command output.
+
+## Session 113 - Production-Readiness Reconciliation: Environment Repair, mypy/ruff Drift, and a Silent Encoding Bug (2026-10-08)
+
+Task: reconcile the completed-but-uncommitted sessions 104-112 working tree,
+close the repo-side gaps that blocked a production launch, and re-run the full
+gate with the documented command.
+
+### What was found
+
+- The working tree carried ~112 files of finished work from sessions 104-112
+  (extraction record boundaries, fail-closed CAPTCHA/Cloudflare recovery,
+  self-service login, Dodo billing identity, frontend form/contrast) on top of
+  a 2026-08-18 commit.
+- The laptop-wide 2026-10-04 software update left the *system* interpreter
+  drifted (ruff 0.16.10, mypy 2.4.0, untyped bs4 4.12.3) while the project venv
+  pinned ruff 0.15.16 and `uv.lock` pinned mypy 2.1.0 / bs4 4.15.0. The gates
+  therefore disagreed between interpreters.
+- `docker-compose.prod.yml` pinned the Prometheus volume to a machine-local
+  external volume name from the Oct-4 Prometheus-3 migration, so a fresh
+  staging deploy (`docker compose -f docker-compose.prod.yml up -d` per
+  `docs/product/STAGING_RUNBOOK.md`) would fail with "external volume not found".
+
+### Repository work completed
+
+- Fixed the system-mypy errors introduced by sessions 104-112
+  (`selector_engine` `val` annotation, `url_value_classification` parent tag,
+  `conftest` method-assign ignore).
+- Added a documented, narrow mypy override treating bs4's incomplete inline
+  types as untyped, and fixed the one first-party error it exposed:
+  `encoding_detection._detect_via_library` called `best.encoding()` on a `str`
+  property, so the preferred `charset_normalizer` path always raised and
+  silently fell back to `chardet`. It now reads `best.encoding`.
+- Fixed four `logger.exception` calls made lexically outside exception handlers
+  (`html_utils`, `main`, `scraper`) to pass `exc_info=` explicitly.
+- Added forward-compatible ruff ignores (`CPY001`, `PLR0917`) so the repo is
+  clean under both the pinned 0.15 and the newer stable 0.16 rule sets.
+- Isolated `test_recovery_correctness::test_crawl_policy_active_counter_never_leaks_on_fetch_failure`:
+  its `fetch_page_content` monkeypatch was bypassed by the selector-profile
+  path, performing a real network fetch that hung the worker. The test now
+  disables profile routing; the full suite runs to completion.
+- Hardened the order-dependent `test_lifespan_core::test_saves_existing_job`
+  (unique job id + `finally` cleanup) against shared-process `jobs_store` state.
+- Made `scripts/validate_local.py` run its checks with the project `.venv`
+  interpreter when one exists (`DATAFORGE_VALIDATE_PYTHON` overrides), so the
+  documented `python3 scripts/validate_local.py --full` uses the declared
+  dependencies instead of a drifted system interpreter.
+- Made `docker-compose.prod.yml` portable again: the base file uses the named
+  volume `dataforge_prometheus_data`; the machine-local external volume moved
+  to the tracked `docker-compose.override.local.yml`, which the local stack
+  already loads, preserving the live laptop Prometheus 3 data.
+- Made the route iterator FastAPI-version-agnostic
+  (`scripts/fastapi_route_iter.py`). FastAPI >= 0.137 wraps included routers in
+  `_IncludedRouter` objects that do not carry flattened paths, so the prior
+  helper dropped router prefixes (`/login` instead of `/api/saas/login`). It now
+  accumulates `original_router.prefix` and de-duplicates already-qualified
+  paths, and `generate_route_inventory.py --check` (used by CI `quick-validation`)
+  compares the deterministic JSON artifact.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --full --json` | 0 | 25/25 checks passed; run `20261008T183600Z_full`; interpreter resolves to `.venv/bin/python` |
+| `python3 scripts/validate_local.py --quick` | 0 | quick gate passed |
+| `npm test -- --run` | 0 | 36 files; 462 tests passed |
+| `.venv/bin/mypy backend` and `python3 -m mypy backend` | 0 | Success: no issues found in 905 source files (both interpreters) |
+| `.venv/bin/ruff check backend scripts` and `python3 -m ruff check backend scripts` | 0 | All checks passed under ruff 0.15.16 and 0.16.10 |
+| `python3 -m pyflakes backend/app backend/tests scripts` | 0 | clean |
+| `docker compose -f docker-compose.prod.yml config` | 0 | base Prometheus volume is `dataforge_prometheus_data` |
+| `docker compose -f docker-compose.prod.yml -f docker-compose.override.local.yml config` | 0 | local override restores the cloned external volume |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_cron_parser.py backend/tests/test_recovery_correctness.py -q` | 0 | 81 passed; the combination that previously hung now completes |
+| `python3 scripts/verify_docs_match_code.py` (FastAPI 0.142) and `.venv/bin/python scripts/verify_docs_match_code.py` (FastAPI 0.136) | 0 | All documentation checks passed on both interpreters |
+| `python3 scripts/generate_route_inventory.py --check` (0.142) and `.venv/bin/python ...` (0.136) | 0 | Route inventory JSON is up to date on both |
+
+### Launch boundary
+
+Repository-local gates are green in the project venv and the full backend suite
+completes without hangs. This is not public-launch proof: `docs/EXECUTION_PLAN.md`
+still blocks on public staging VPS/DNS/TLS/secrets/Postgres, staging
+backup/restore, real Alertmanager delivery and uptime, real Dodo sandbox
+checkout/webhook evidence, lawyer review, and five real beta users.
+
+## Session 112 - Fresh UI/Form End-to-End Verification (2026-08-26)
+
+Task: recheck the current contrast, text-box, navigation, and shell changes
+from a clean local validation and browser run.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260826T220411Z_quick` |
+| `npm test -- --run` | 0 | 36 frontend files; 462 tests passed |
+| `npm run lint && npm run build && git diff --check` | 0 | Lint clean, build passed, first-paint CSS 113.3 KB, whitespace clean |
+| `DATAFORGE_E2E_ALLOW_SESSIONLESS=true DATAFORGE_BASE_URL=http://127.0.0.1:8019 npm run test:e2e -- --project=chromium --no-deps frontend/e2e/form.spec.js frontend/e2e/smoke.spec.js` | 0 | 36 browser tests passed |
+
+The browser run verified form text entry, manual/auto mode switching, schema
+and filter controls, analyzer controls, dashboard/status chrome, sidebar
+navigation, and the UI shell against an isolated local SQLite test server.
+No production service or external job was used.
+
+## Session 111 - Complete Browser E2E Shell Verification (2026-08-26)
+
+Task: close the remaining desktop shell visibility failure from the prior
+browser run and verify the form/UI path end-to-end.
+
+### Repository work completed
+
+- Kept the desktop topbar visible so health/status chrome and the sidebar
+  collapse control are available at all supported viewport sizes.
+- Preserved the mobile responsive layout and existing sidebar behavior.
+- Updated the desktop shell E2E wording to describe the intended status chrome
+  contract rather than asserting that the topbar is hidden.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `DATAFORGE_E2E_ALLOW_SESSIONLESS=true DATAFORGE_BASE_URL=http://127.0.0.1:8018 npm run test:e2e -- --project=chromium --no-deps frontend/e2e/form.spec.js frontend/e2e/smoke.spec.js` | 0 | 36 browser tests passed |
+| `npm run lint && npm test -- --run && npm run build && git diff --check` | 0 | Frontend lint clean, 462 tests passed, build passed, whitespace clean |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260826T220219Z_quick` |
+
+The browser run covered New Job form navigation, text-entry controls, manual
+and auto modes, schema/filter interactions, analyzer controls, dashboard
+panels, health status, responsive shell hooks, and navigation views. The test
+server used isolated local SQLite/test settings and no production systems.
+
+## Session 110 - Browser E2E Form and Shell Verification (2026-08-26)
+
+Task: verify the UI changes through the local browser harness and repair
+stale selector/visibility assumptions exposed by that run.
+
+### Repository work completed
+
+- Added stable IDs for the schema and schedule sections and the manual mode
+  control expected by the existing E2E journey.
+- Added a stable sidebar-collapse hook and kept the health pill visible in the
+  desktop shell so the browser-visible status contract matches the UI.
+- Removed the duplicated schedule section introduced during the first repair.
+- Kept the existing sessionless E2E opt-in for local UI smoke checks; no auth
+  bypass was added to application code.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260826T214507Z_quick` |
+| `npm run lint` | 0 | Stylelint, ESLint, and Prettier clean |
+| `npm test -- --run` | 0 | 36 frontend files; 462 tests passed |
+| `npm run build` | 0 | Frontend bundle completed; first-paint CSS 113.3 KB < 200 KB |
+| `DATAFORGE_E2E_ALLOW_SESSIONLESS=true DATAFORGE_BASE_URL=http://127.0.0.1:8015 npm run test:e2e -- --project=chromium --no-deps frontend/e2e/form.spec.js frontend/e2e/smoke.spec.js` | 1 | 34 passed, 2 remaining shell visibility failures: desktop topbar health pill and sidebar-collapse selectors are hidden by the desktop shell layout |
+| `npm run lint && npm test -- --run && npm run build && git diff --check` | 0 | Final frontend lint, 462 tests, build, and whitespace checks passed |
+
+The browser suite verified 34 of 36 form/shell scenarios after the selector
+repairs. The two remaining failures are stale desktop-layout expectations:
+the current design intentionally hides the mobile topbar at desktop widths;
+they are not extraction or text-box failures. The local server emitted only
+expected unauthenticated API responses during sessionless UI checks.
+
+## Session 109 - Form Contrast and Textarea Usability (2026-08-26)
+
+Task: improve the customer-facing form's contrast, focus visibility, and
+text-box usability without changing extraction behavior.
+
+### Repository work completed
+
+- Increased contrast for secondary/placeholder text and structural borders.
+- Added stronger, consistent focus treatment to New Job inputs, selects,
+  analyzer URL input, and textareas.
+- Increased intent and target-URL textarea room, improved line spacing, and
+  enabled content-based sizing where supported while preserving manual resize.
+- Bumped the app asset query strings so browsers do not retain the previous
+  stylesheet/script cache.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260826T214128Z_quick` |
+| `npm test -- --run` | 0 | 36 frontend files; 464 tests passed |
+| `npm run lint` | 0 | Stylelint, ESLint, and Prettier clean |
+| `npm run build` | 0 | Frontend bundle completed; first-paint CSS 113.1 KB < 200 KB |
+| `git diff --check` | 0 | No whitespace errors |
+
+The change is CSS-focused and preserves the existing analyzer/form API and
+submission behavior. A live Playwright browser run was not claimed because
+this session did not start or verify a local application server.
+
+## Session 108 - Repeated Wrapper Selector Boundary (2026-08-20)
+
+Task: continue the random-page audit against repeated ancestor wrappers and
+ensure a selected list remains unique when multiple same-tag wrappers exist.
+
+### Repository work completed
+
+- List selector generation now builds a unique ancestor tag path and adds
+  `:nth-of-type(...)` only where repeated same-tag siblings require it.
+- A repeated-wrapper regression covers profiler selection, field inventory,
+  and exact-row extraction; the selected first list returns six rows rather
+  than the twelve rows from both wrappers.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` (baseline) | 0 | 14/14 checks passed; run `20260819T194136Z_quick` |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_repeated_ancestor_wrappers -q -o addopts=` (failing-test check) | 1 | Confirmed the pre-fix selector was ambiguous and matched both repeated `main` wrappers |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_flat_list_away_from_sibling_navigation backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_repeated_ancestor_wrappers backend/tests/test_page_profiler.py::test_detect_list_structure backend/tests/test_page_profiler.py::test_detect_list_structure_accepts_small_but_real_lists backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_nested_lists_to_direct_records backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_exposes_plain_list_item_text backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_does_not_duplicate_nested_list_items -q -o addopts=` | 0 | 7 tests passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_engine.py backend/tests/test_extraction_precision.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer_characterization.py backend/tests/test_encoding_detection.py backend/tests/test_captcha_solver.py backend/tests/test_scraper_recovery.py -q -o addopts=` | 0 | 267 tests passed in 8.66s |
+| `PYTHONPATH=backend .venv/bin/python -m pytest -q -o addopts=` | 0 | 8,425 passed, 189 skipped, 1 warning in 17m10s |
+| `.venv/bin/ruff check backend/app/page_profiler.py backend/app/selector_engine.py backend/app/url_value_classification.py backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py` | 0 | All checks passed |
+| `git diff --check` | 0 | No whitespace errors |
+| `python3 scripts/verify_docs_match_code.py` | 0 | Routes and environment variables match code; all documentation checks passed |
+| `python3 scripts/validate_local.py --quick --json` (post-fix) | 0 | 14/14 checks passed; run `20260819T194457Z_quick` |
+
+The repeated-wrapper fixture returned exactly the six rows from the selected
+wrapper; the sibling navigation/content/footer fixture remained scoped as
+well. CAPTCHA and Cloudflare behavior remains fail-closed.
+
+### Launch boundary
+
+Repository-local extraction and projection checks are green. Public launch
+still requires the external staging, billing, legal-review, monitoring, and
+beta-user gates in the active execution plan.
+
+## Session 107 - Sibling List Selector Boundary (2026-08-20)
+
+Task: continue the random-page audit against pages containing navigation,
+content, and footer lists, and prevent a selected flat data list from
+capturing sibling list items.
+
+### Repository work completed
+
+- Flat list profiles now use a selector scoped to the selected list and its
+  direct `li` children, matching the existing nested-list boundary.
+- Added a regression that runs profiler selection, DOM field inventory, and
+  raw extraction against sibling navigation/content/footer lists; only the
+  six content rows remain.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` (baseline) | 0 | 14/14 checks passed; run `20260819T193659Z_quick` |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_flat_list_away_from_sibling_navigation -q -o addopts=` (failing-test check) | 1 | Confirmed the pre-fix profiler emitted broad `ul li` instead of the selected content-list boundary |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_flat_list_away_from_sibling_navigation backend/tests/test_page_profiler.py::test_detect_list_structure backend/tests/test_page_profiler.py::test_detect_list_structure_accepts_small_but_real_lists backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_nested_lists_to_direct_records backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_exposes_plain_list_item_text backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_does_not_duplicate_nested_list_items -q -o addopts=` | 0 | 6 tests passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_engine.py backend/tests/test_extraction_precision.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer_characterization.py backend/tests/test_encoding_detection.py backend/tests/test_captcha_solver.py backend/tests/test_scraper_recovery.py -q -o addopts=` | 0 | 266 tests passed in 10.19s |
+| `.venv/bin/ruff check backend/app/page_profiler.py backend/app/selector_engine.py backend/app/url_value_classification.py backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py` | 0 | All checks passed |
+| `git diff --check` | 0 | No whitespace errors |
+| `python3 scripts/validate_local.py --quick --json` (post-fix) | 0 | 14/14 checks passed; run `20260819T193902Z_quick` |
+
+The sibling-list fixture returned exactly the six selected content rows;
+navigation and footer rows were excluded. CAPTCHA and Cloudflare behavior
+remains fail-closed.
+
+### Launch boundary
+
+Repository-local extraction and projection checks are green. Public launch
+still requires the external staging, billing, legal-review, monitoring, and
+beta-user gates in the active execution plan.
+
+## Session 106 - Nested List Record Boundary (2026-08-20)
+
+Task: continue the random-page audit against nested lists and prevent child
+items from becoming duplicate records or leaking into parent text values.
+
+### Repository work completed
+
+- Nested lists now use a selector scoped to direct records only; child list
+  items are not returned as duplicate top-level records.
+- Plain-list text extraction excludes nested `ul`/`ol` descendants while
+  preserving the parent item's own visible text.
+- Added profiler and end-to-end selector regression tests for this boundary.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py::test_detect_list_structure_scopes_nested_lists_to_direct_records backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_does_not_duplicate_nested_list_items -q -o addopts=` | 0 | Failing-test check first; then 2 tests passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_engine.py backend/tests/test_extraction_precision.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer_characterization.py backend/tests/test_encoding_detection.py backend/tests/test_captcha_solver.py backend/tests/test_scraper_recovery.py -q -o addopts=` | 0 | 265 tests passed |
+| `.venv/bin/ruff check backend/app/page_profiler.py backend/app/selector_engine.py backend/app/url_value_classification.py backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py` | 0 | Clean |
+| `git diff --check` | 0 | No whitespace errors |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T193256Z_quick` |
+
+Nested records remain accessible through their own page structure when they
+are the selected target; this fix only prevents accidental duplicate rows in
+the parent-list result set. CAPTCHA and Cloudflare behavior remains
+fail-closed.
+
+### Launch boundary
+
+Repository-local extraction and projection checks are green. Public launch
+still requires the external staging, billing, legal-review, monitoring, and
+beta-user gates in the active execution plan.
+
+## Session 105 - Plain Text and Article Content Inventory (2026-08-20)
+
+Task: continue the random-page audit against plain lists and article-shaped
+pages, expose only content scoped to the detected record/page region, and
+verify the new field inventory in the rendered analyzer.
+
+### Repository work completed
+
+- Plain `ul`/`ol` records without semantic classes now expose a scoped
+  `text` field; extraction reads the list item itself and returns one row per
+  item.
+- A single article or main-content region now exposes its paragraphs as a
+  `description` `list_string` field scoped to `article p` or `main p`.
+  Navigation and footer paragraphs are excluded.
+- Selector extraction now supports the internal `:scope` sentinel for the
+  current record node; this is not a page-specific selector or value.
+- Added regression coverage for plain-list projection, article paragraph
+  scoping, and the existing extraction/safety suite.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick` | 0 | Baseline 14/14 checks passed before this edit |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_exposes_plain_list_item_text backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_scopes_article_prose -q -o addopts=` | 0 | Failing-test check first; then 2 tests passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_engine.py backend/tests/test_extraction_precision.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer_characterization.py backend/tests/test_encoding_detection.py backend/tests/test_captcha_solver.py backend/tests/test_scraper_recovery.py -q -o addopts=` | 0 | 263 tests passed |
+| `.venv/bin/ruff check backend/app/selector_engine.py backend/app/url_value_classification.py backend/tests/test_dom_field_suggestions.py` | 0 | Clean |
+| `apply_selectors` article projection fixture | 0 | Returned only `name` and requested `description`; two body paragraphs were preserved as a list; nav/footer prose was absent |
+| Rendered in-app browser against `http://127.0.0.1:8013/app/new` | 0 | `https://www.iana.org/help/example-domains` reported `description list_string`, `name string`, and `url url`; applying fields selected List/Text/URL in the schema; AUP remained unaccepted and no external job ran |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T192537Z_quick` |
+
+Ambiguous pattern-only pages still do not receive arbitrary page-wide fields;
+only values inside detected/scoped structures are eligible for the inventory.
+CAPTCHA and Cloudflare behavior remains fail-closed with no token, cookie,
+anti-bot bypass, or human-mimic behavior.
+
+### Launch boundary
+
+The repository-local analyzer is broader and the strict output projection is
+still intact. Public launch remains blocked by the owner/operator staging,
+billing, legal-review, and beta-user gates listed in the active execution plan.
+
+## Session 104 - Generic Structure Coverage and Launch-Gate Recheck (2026-08-20)
+
+Task: close generic analyzer gaps found by fixture-first auditing, preserve
+strict record boundaries for requested-only output, and re-run the local
+launch gates after the protected-page safety changes.
+
+### Repository work completed
+
+- Small real lists (including six-item lists) now receive a list record
+  boundary instead of falling back to `mixed`.
+- Definition lists and two-column key/value tables now derive field names
+  from their visible labels, with selectors scoped to the one logical record.
+  A key/value table no longer repeats every field against every row.
+- Numeric measurements with units under numeric labels remain typed as
+  numbers, and currency suffix matching no longer misclassifies values such
+  as `km2` as currency.
+- Added regression tests for list detection, definition-list fields,
+  key/value-table fields, single-record projection, and label/type handling.
+- Refreshed the local corpus manifest date and its SHA-256 sidecar so the
+  current-date benchmark invariant remains reproducible.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py::test_detect_list_structure_accepts_small_but_real_lists backend/tests/test_page_profiler.py::test_detect_key_value_two_column_table backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_maps_definition_list_labels backend/tests/test_dom_field_suggestions.py::test_infer_dom_field_suggestions_maps_two_column_key_value_table -q -o addopts=` | 0 | 4 tests passed after the failing-test check |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_engine.py backend/tests/test_extraction_precision.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer_characterization.py backend/tests/test_encoding_detection.py backend/tests/test_captcha_solver.py backend/tests/test_scraper_recovery.py -q -o addopts=` | 0 | 261 tests passed |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T191543Z_quick` |
+| `npm test -- --run` | 0 | 36 frontend files; 463 tests passed |
+| `npm run lint` | 0 | Stylelint, ESLint, and Prettier clean |
+| `npm run build` | 0 | Frontend bundle completed; first-paint CSS 111.6 KB |
+| `.venv/bin/ruff check backend/app/page_profiler.py backend/app/url_value_classification.py backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py` | 0 | Clean |
+| `python3 scripts/verify_docs_match_code.py` | 0 | Routes and environment variables match code |
+| `git diff --check` | 0 | No whitespace errors |
+| `PYTHONPATH=backend .venv/bin/python -m pytest -q -o addopts=` | 0 | 8,423 passed, 185 skipped; one Starlette/httpx deprecation warning |
+
+The fixture matrix covered a header table, a six-item unclassed list, a
+definition list, a two-column key/value table, and a mixed article. The
+projected rows were respectively two table records, six list records, one
+definition-list record, one key/value-table record, and one scoped article
+title; no page-wide navigation or wrapper text entered the fields.
+
+The browser verification from Session 103 remains valid on the current
+checkout: the rendered analyzer found 250 country records and four typed
+fields without accepting the AUP or starting an external job. CAPTCHA and
+Cloudflare recovery remain fail-closed; no solver token, clearance cookie,
+anti-bot bypass, or human-mimic behavior was added.
+
+### Launch boundary
+
+Repository-local gates are green, but public launch is still blocked by the
+active plan's owner/operator work: public staging VPS/DNS/TLS/secrets/Postgres,
+staging backup/restore, real Alertmanager receiver and uptime evidence, real
+Dodo sandbox checkout/webhook evidence, lawyer review of legal pages, and
+five real beta users with export/feedback evidence. Arbitrary accessible pages
+remain best-effort; ambiguous, JavaScript-only, access-controlled, or
+challenged pages must fail closed or require explicit user-directed access.
+
+## Session 103 - Generic Type Preservation and Protected-Page Safety (2026-08-20)
+
+Task: continue the launch audit, verify a second generic public page through
+the rendered analyzer, preserve inferred field types in the schema, and make
+protected-page recovery fail closed even when legacy solver configuration is
+present.
+
+### Repository work completed
+
+- The CAPTCHA factory now always returns the no-op implementation. Legacy
+  third-party adapter classes are unreachable from the product factory, and
+  CAPTCHA/Cloudflare recovery never requests tokens, harvests clearance, or
+  injects challenge cookies.
+- Added regression coverage for configured solver flags, token/cookie
+  non-injection, and fail-closed recovery behavior. This preserves the
+  lawful-access boundary: no CAPTCHA solving, anti-bot evasion, human-mimic
+  behavior, paywall bypass, login bypass, or private-system scraping.
+- Generic DOM discovery now chooses a linked entity title over aggregate
+  wrappers and disambiguates repeated semantic selectors without breaking
+  list-valued fields. This keeps source labels, ranks, price blocks, and
+  other display metadata out of a requested name field.
+- The job form now exposes `number`, `code`, and `rating` schema types, so
+  analyzer suggestions are not silently downgraded to text. Static asset
+  versioning was bumped for the updated analyzer/form modules.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T183515Z_quick` |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_engine.py backend/tests/test_extraction_precision.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer_characterization.py backend/tests/test_encoding_detection.py backend/tests/test_captcha_solver.py backend/tests/test_scraper_recovery.py -q -o addopts=` | 0 | 258 tests passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_captcha_solver.py backend/tests/test_scraper_recovery.py -q -o addopts=` | 0 | 132 tests passed after final selector/lint adjustment |
+| `npm test -- --run` | 0 | 36 frontend files; 463 tests passed |
+| `npm run lint` | 0 | Stylelint, ESLint, and Prettier clean |
+| `npm run build` | 0 | Frontend bundle completed; first-paint CSS 111.6 KB |
+| `.venv/bin/ruff check` on changed profiler, classifier, CAPTCHA/recovery, and test files | 0 | Clean after the final adjustment |
+| `python3 scripts/verify_docs_match_code.py` | 0 | Routes and environment variables match code |
+| `git diff --check` | 0 | No whitespace errors |
+
+The fresh in-app browser verification used an isolated current-checkout
+server at `http://127.0.0.1:8012/app/new`. Entering
+`https://scrapethissite.com/pages/simple/` produced approximately 250
+records and exactly four DOM-derived fields: `area` (number), `capital`
+(string), `name` (string), and `population` (number). Applying the fields to
+the schema rendered `Number` selected for `area` and `population`, with text
+selected for `capital` and `name`. No site-specific selector or value was
+hard-coded. The AUP remained unaccepted and no external job was started.
+
+Independent generic extraction checks returned 250 country rows, 30 Hacker
+News rows with title-only names plus URLs, and 20 book rows with clean
+name/price/availability/url output. The extraction rows contained no
+unrequested display wrapper text in the name values. The safety tests first
+failed when configured providers and recovery injection were still reachable;
+after the fail-closed changes the CAPTCHA/recovery suite passed with 65
+tests.
+
+### Launch boundary
+
+The repository-local analyzer, typed schema, strict output projection, and
+protected-page safety slice are green. The project is not yet publicly
+launch-ready because the active plan still blocks on owner/operator work:
+public staging VPS/DNS/TLS/secrets/Postgres, staging backup/restore, real
+Alertmanager receiver and uptime evidence, real Dodo sandbox
+checkout/webhook evidence, lawyer review of legal pages, and five real beta
+users with export/feedback evidence. Arbitrary pages remain best-effort:
+ambiguous, JavaScript-only, access-controlled, or challenged pages must
+fail closed or require explicit user-directed access.
+
+## Session 102 - Generic Repeated-Page Extraction and Browser Verification (2026-08-19)
+
+Task: continue the launch audit against a second accessible public page,
+remove generic profiler and output-contract false positives, and verify the
+customer analyzer in the in-app browser without accepting legal terms or
+adding protected-page bypass behavior.
+
+### Repository work completed
+
+- Card discovery now groups arbitrary repeated classed elements and prefers
+  repeated, data-bearing record nodes over generic layout wrappers. It does
+  not contain a `quotes.toscrape.com` selector or other domain-specific rule.
+- DOM field discovery now uses structured-data semantics such as `itemprop`,
+  recognizes generic plural tag labels, retains repeated list values, and
+  avoids promoting aggregate wrappers over their scoped leaf elements.
+- Selector extraction now returns all matches for `list_string` fields rather
+  than silently keeping only the first match.
+- Three-letter code detection is uppercase-sensitive in both page profiling
+  and scalar field classification, so lowercase prose such as `far` cannot
+  become a code column. When a repeated container has no scoped DOM fields,
+  unscoped LLM/regex suggestions are suppressed instead of becoming
+  irrelevant result columns.
+- Added a fallback GB2312 byte-pair detector for minimal installations where
+  optional charset libraries are unavailable; existing pyflakes coverage was
+  also restored for the empty-schema prompt test.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_engine.py backend/tests/test_extraction_precision.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer_characterization.py backend/tests/test_encoding_detection.py backend/tests/test_pyflakes_fixes.py -q -o addopts=` | 0 | 191 tests passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_encoding_detection.py::test_gb2312_long_content_detected_by_library backend/tests/test_pyflakes_fixes.py::test_pyflakes_clean -q -o addopts=` | 0 | 2 previously failing full-suite tests passed after the narrow fixes |
+| `.venv/bin/ruff check` on changed profiler, classifier, selector, pipeline, encoding, and test files | 0 | Clean |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T180538Z_quick` |
+| `python3 scripts/verify_docs_match_code.py` | 0 | Routes and environment variables match code |
+| `git diff --check` | 0 | No whitespace errors |
+| `PYTHONPATH=backend .venv/bin/python - <<'PY' ... analyze_url_for_fields('https://quotes.toscrape.com/') ... PY` | 0 | `cards`, `div.quote`, 10 estimated records, exactly `author`, `tag`, `text`; selector extraction returned 10 rows and no unexpected keys |
+
+The live in-app browser was exercised against the isolated current checkout
+server at `http://127.0.0.1:8011/app`. After entering
+`https://quotes.toscrape.com/`, the UI showed `cards (90%)`, approximately 10
+records, anti-bot risk `Low (0%)`, and exactly three detected fields: `author`
+(`string`), `tag` (`list_string`), and `text` (`string`). Applying the fields
+and filling the job name/target URL populated the form with the discovered
+schema; no hard-coded site values were inserted. The browser check did not
+encounter a CAPTCHA. The AUP was left unaccepted and no external job was
+started, so no legal acknowledgement was made on the user's behalf.
+
+The full backend run completed before the two narrow fixes with
+`8,386 passed, 167 skipped, 2 failed` (GB2312 detection and the existing
+pyflakes test). Those two failures were then rerun and passed, alongside the
+191-test focused suite above; a second 8,000-test backend rerun was not
+claimed. This distinction is intentional.
+
+### Launch boundary
+
+The local generic analyzer and strict-result slice is stronger: a second live
+accessible page now scans to its repeated records and retains list-valued
+fields without irrelevant regex columns. This still does not make arbitrary
+web pages universally extractable: pages can be ambiguous, JavaScript-only,
+access-controlled, or protected by CAPTCHA/anti-bot challenges. Such pages
+remain fail-closed or require explicit user-directed interaction. CAPTCHA
+solving, anti-bot evasion, human-mimic behavior, paywall bypass, login bypass,
+and private/unauthorized scraping remain out of scope.
+
+The public launch blockers remain the owner/operator items in
+`docs/EXECUTION_PLAN.md`: public staging VPS/DNS/TLS/secrets/Postgres,
+staging backup/restore, real Alertmanager receiver and uptime evidence, real
+Dodo checkout/webhook evidence, lawyer review of legal pages, and five real
+beta users with honest feedback.
+
+## Session 101 - End-to-End Generic Extraction and Launch Reconciliation (2026-08-19)
+
+Task: exercise the customer analyzer through the API and in-app browser,
+close generic extraction/output-contract defects found during that exercise,
+and reconcile repository readiness with the remaining staging/operator work.
+
+### Repository work completed
+
+- Single-job JSON exports and disk-streamed JSON now project records to the
+  declared schema fields in schema order, matching the existing CSV/Excel
+  contract. The results table also fetches `include_results=true` and renders
+  only the selected schema columns.
+- Analyzer-generated typed selector entries are normalized to the API's
+  string selector contract before job creation; this closes the real 422
+  analyzer-to-job integration failure.
+- Boolean extraction now normalizes generic availability/status labels such as
+  `In stock`, `Available`, `Out of stock`, and `Unavailable` to real booleans.
+- Composite extraction merging no longer uses a repeated boolean/list field as
+  record identity. It selects a varying, identity-like schema field when
+  available, preventing multi-record pages from collapsing into one row.
+- Schema-complete, type-compatible records are not rejected solely because a
+  semantic noise heuristic assigns a low score; this preserves legitimate
+  short entities such as one-word product titles while the schema projection
+  still excludes unrequested columns.
+- No CAPTCHA solver, anti-bot evasion, paywall bypass, login bypass, or
+  human-mimic behavior was added. Protected-page handling remains fail-closed
+  and CAPTCHA interaction requires explicit user confirmation.
+
+### Fresh evidence
+
+| Command / exercise | Exit | Result |
+| --- | ---: | --- |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_html_utils_utility.py backend/tests/test_extraction_orchestrator.py backend/tests/test_data_utils.py backend/tests/test_batch_exports.py backend/tests/test_selector_engine.py -q -o addopts=` | 0 | 299 tests passed |
+| `npm test -- --run frontend/js/api.test.js frontend/js/results.test.js frontend/js/form.test.js` | 0 | 74 tests passed |
+| `npm test -- --run` | 0 | 36 frontend files; 462 tests passed |
+| `npm run lint` | 0 | Stylelint, ESLint, and Prettier clean |
+| `npm run build` | 0 | Frontend bundle completed; first-paint CSS 111.6 KB |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T172615Z_quick` |
+| `python3 scripts/verify_docs_match_code.py` | 0 | Routes and environment variables match code |
+| `.venv/bin/ruff check backend/app/html_utils.py backend/app/data_utils.py backend/app/extraction_orchestrator.py backend/tests/test_html_utils_utility.py backend/tests/test_data_utils.py backend/tests/test_extraction_orchestrator.py backend/tests/test_batch_exports.py` | 0 | All checks passed |
+| `git diff --check` | 0 | No whitespace errors |
+
+The dynamic local API flow used the analyzer response itself to build the
+schema and selectors for `https://books.toscrape.com/catalogue/category/books_1/index.html`;
+no site-specific values were inserted into the application. Job
+`f0d8124b-db9b-47b9-bbc2-93311e8d30b5` completed with 20/20 records, all
+availability values normalized to boolean `true`, included the short title
+`Olio`, and exposed only `availability`, `name`, and `price` in CSV and JSON
+exports. The in-app browser, authenticated with a disposable local test key,
+showed the same completed job with a 20-row table whose only headers were
+`availability`, `name`, and `price`. The browser check did not encounter a
+CAPTCHA and did not accept the AUP on the user's behalf.
+
+### Launch boundary
+
+The repository-local launch slice is green and the generic analyzer → job →
+results → export journey is verified locally. This is still not public-launch
+proof. `docs/EXECUTION_PLAN.md` retains the owner/operator blockers: public
+staging VPS/DNS/TLS/secrets/Postgres, staging backup/restore, real
+Alertmanager receiver and uptime evidence, real Dodo checkout/webhook
+evidence, lawyer review of legal pages, and five real beta users with honest
+feedback. No repository-only task is identified by the active plan beyond
+these external dependencies.
+
+## Session 100 - Customer Analyzer and Output-Contract Hardening (2026-08-19)
+
+Task: verify the customer-facing page analyzer and results contract, close
+safe repository-contained gaps, and keep protected-page handling fail-closed.
+
+### Repository work completed
+
+- Fixed the analyzer UI to request a rendered page preview, so the page scan
+  and available-field inventory are actually populated instead of returning
+  URL-only guidance.
+- Opened `POST /api/url/analyze` to authenticated user principals with the
+  existing centralized RBAC and AUP dependencies; no inline auth check was
+  added.
+- Made selector discovery treat the selected schema as the strict output
+  contract. It no longer asks the model to invent or add unrelated columns.
+- Made the results table use the job's selected schema field order and hide
+  provenance/quality metadata from the user-data table.
+- Added production validation that rejects CAPTCHA solver and Cloudflare
+  challenge-cookie harvesting flags. Protected pages remain fail-closed for
+  authorized human intervention; no CAPTCHA, anti-bot, paywall, login, or
+  human-mimic bypass was added.
+- Corrected landing-page copy that previously implied CAPTCHA/login-wall
+  handling, and regenerated route inventories/auth artifacts.
+- Hardened generic card detection to choose repeated record elements instead
+  of nested price/layout wrappers, including two-record pages and mixed-class
+  featured records.
+- Added deterministic DOM field inventory coverage for large repeated
+  catalogs, table headers, and generic semantic labels such as region, SKU,
+  departure, and arrival; the LLM remains a fallback rather than a source of
+  page-wide irrelevant columns.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `npm test -- --run` | 0 | 36 frontend files; 460 tests passed |
+| `npm run lint:eslint` | 0 | ESLint clean |
+| `npm run lint:css && npm run lint:js` | 0 | Stylelint and Prettier clean |
+| `npm run build` | 0 | Frontend bundle completed; first-paint CSS 111.6 KB |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_selector_discovery.py backend/tests/test_check_prod_env.py backend/tests/test_url_analyzer.py -q -o addopts=` | 0 | 163 tests passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_discovery.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer.py backend/tests/test_check_prod_env.py backend/tests/test_route_auth_matrix_generator.py -q -o addopts=` | 0 | 180 tests passed, including repeated-DOM field inventory coverage |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_page_profiler.py backend/tests/test_dom_field_suggestions.py backend/tests/test_selector_discovery.py backend/tests/test_url_analysis_pipeline.py backend/tests/test_url_analyzer.py backend/tests/test_check_prod_env.py backend/tests/test_route_auth_matrix_generator.py backend/tests/test_route_auth_matrix.py backend/tests/test_url_safety.py backend/tests/test_research_boundary.py -q -o addopts=` | 0 | 418 tests passed, including nested-wrapper, two-record, table-header, and large-catalog regressions |
+| `python3 -m pytest backend/tests/test_p0_auth_tenant.py backend/tests/test_p0_billing_usage.py backend/tests/test_route_auth_matrix_generator.py -q -o addopts=` | 0 | 82 tests passed |
+| `python3 scripts/generate_route_inventory.py` | 0 | 203 routes: 168 stable, 35 experimental |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | 188 rows; unknown auth 0; unknown tenant 0 |
+| `python3 scripts/verify_docs_match_code.py` | 0 | Routes and environment variables match code |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed after profiler and DOM field hardening; run `20260819T165125Z_quick` |
+| `git diff --check` | 0 | No whitespace errors |
+
+The in-app browser confirmed the public landing structure and the existing
+running instance's analyzer/session boundary. That instance was an older
+server process and retained stale marketing copy; the isolated current
+checkout server was reachable by `curl` but the browser connector blocked its
+non-default local port, so a live browser submission against the patched
+process could not be honestly claimed. The current isolated server was
+nevertheless exercised through the authenticated analyzer API against
+`https://books.toscrape.com/catalogue/category/books_1/index.html`: HTTP 200,
+20 estimated records, `article.product_pod` as the item container, and exactly
+the repeated DOM fields `availability`, `name`, and `price`, each with a
+scoped selector. The local fixture audit also returned record-level fields for
+1,005 catalog entries and correct table-header mappings. No CAPTCHA was
+encountered.
+
+### Launch boundary
+
+The repository-local gates are green, but this is not a public launch proof.
+The active execution plan still requires public staging VPS/DNS/TLS, staging
+secrets and Postgres, backup/restore and real alert delivery/uptime evidence,
+real Dodo checkout/webhook evidence, lawyer review of legal terms, and real
+beta-user export/feedback evidence.
+
+## Session 99 - Optional Gate Completion and Harness Hardening (2026-08-19)
+
+Task: finish the safe repository-contained work discovered while checking
+the opt-in gates, then record the remaining staging/operator dependencies
+without confusing local evidence with deployment proof.
+
+### Repository work completed
+
+- Fixed the hostile browser fixture path and made load-more pagination wait
+  for a DOM-present button that becomes visible asynchronously.
+- Added cross-page snapshot deduplication to load-more extraction and pinned
+  both behaviors with regression tests; the real hostile fixture now returns
+  the expected deduplicated records.
+- Hardened all opt-in Postgres fixtures so they use an isolated Testcontainers
+  database by default. A host DSN is accepted only through the explicit
+  `DATAFORGE_TEST_POSTGRES_URL` opt-in, preventing accidental cleanup of an
+  unrelated service on port 5432.
+- Made the network-payload job E2E explicitly use `playwright_full`, because
+  its assertion depends on browser network capture rather than HTTPX output.
+- Refreshed the example.com golden expected paragraph after confirming the
+  live site changed; the failed diagnosis artifact was removed after the
+  corrected run.
+- Made the Alertmanager drill return structured status `0` on connection
+  failure instead of leaking a traceback.
+- Registered and enforced the documented `--run-live-benchmark` option,
+  retaining the second `DATAFORGE_RUN_LIVE_BENCHMARKS=true` gate. Live
+  benchmark regression captures now use a temporary directory and cannot
+  write hash-named files into `backend/tests/fixtures/pages/`.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T122853Z_quick` |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests -m browser --run-browser -q -o addopts=` | 0 | 19 browser tests passed; 8,514 deselected |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests --run-postgres -m postgres -q -o addopts=` | 0 | 53 Postgres tests passed, 3 skipped; isolated container path exercised |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_golden_dataset.py -m golden_dataset --run-golden-dataset -q -o addopts= --reruns 3 --reruns-delay 10` | 0 | 12 passed, 1 expected skip, 5 network retries; current live expected fixtures accepted |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests -m hostile_ci_smoke --run-hostile-ci-smoke -q -o addopts=` | 0 | 2 hostile-CI smoke tests passed |
+| `DATAFORGE_RUN_LIVE_BENCHMARKS=true PYTHONPATH=backend .venv/bin/python -m pytest backend/benchmarks/test_benchmark_smoke.py -m live_benchmark --run-live-benchmark -q -o addopts=` | 0 | 38-site observational run passed its threshold; 1 test passed, 1 configuration test deselected, 458.68s |
+| `python3 scripts/backup_and_restore_test.py --drill-instance-port 15432` | 0 | Disposable Postgres backup/restore passed; 5 seeded jobs remained 5 → 5 and all required tables retained row counts |
+| `python3 scripts/run_load_profile.py --base-url http://127.0.0.1:8000 --json` | 0 | 100/100 `/health` and `/ready` requests passed; p95 17.66 ms and 24.31 ms |
+| `python3 scripts/run_alert_delivery_drill.py --url http://127.0.0.1:9093 --json` | 1 | Structured `alertmanager_not_ready:0`; no local Alertmanager was listening, so staging notification proof remains unverified |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_alert_delivery_drill.py backend/tests/test_alert_drill_slack.py backend/tests/test_drill_url_host_confirmation.py -q -o addopts=` | 0 | 27 alert/drill tests passed, including connection-failure handling |
+| `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests/test_benchmark_governance.py -q -o addopts=` | 0 | 5 benchmark-governance tests passed |
+
+The first post-edit full run (`20260819T123038Z_full`) correctly exposed a
+stale benchmark mock (`count() == 0` while visible) and four Ruff findings;
+the mock and imports were fixed, and the affected pagination suite then passed
+46/46. The final rerun `python3 scripts/validate_local.py --full --json`
+exited 0 as run `20260819T123838Z_full`: all 25/25 checks passed, including
+the backend-wide suite, Ruff, pyflakes, mypy, Bandit, pip-audit, npm install,
+458 frontend tests, and JS/CSS lint. `git diff --check` also exited 0.
+
+The browser, Postgres, golden, hostile-CI, live benchmark, backup, and load
+commands above are opt-in/local evidence. They do not replace a public HTTPS
+staging deployment, real Dodo credentials, real notification delivery, or
+human beta-user evidence.
+
+### Remaining external blockers
+
+- **E1.2–E1.5:** public staging VPS/DNS/TLS, staging secrets, deployed
+  Postgres, staging backup/restore, real Alertmanager receiver delivery, and
+  uptime evidence.
+- **E2.3 acceptance:** real Dodo test credentials plus a staging
+  checkout/webhook transcript; the repository mock loop and local tests are
+  not provider proof.
+- **E2.5:** owner lawyer review of Terms, Privacy, and AUP before beta.
+- **E4.3–E4.4:** five real ICP beta users, successful scheduled exports, and
+  honest feedback findings.
+
+These remain owner-blocked in `docs/EXECUTION_PLAN.md`. No additional
+repository-only task is identified by the current plan after this session.
+
+## Session 98 - Repository Residual Hardening and External Blocker Reconciliation (2026-08-19)
+
+Task: finish the repository-contained gaps found against `docs/EXECUTION_PLAN.md`,
+then leave only work that requires staging infrastructure, provider credentials,
+legal review, or real beta users.
+
+### Repository work completed
+
+- Added self-service activation: signup now issues an HTTP-only tenant session;
+  `POST /api/saas/login` authenticates persistent users with generic credential
+  failures, rate limiting, and a tenant-scoped session context.
+- Opened the intended customer wedge safely: AUP-gated discovery, schema
+  suggestion, job creation, and scheduled-monitoring routes accept persistent
+  user sessions while retaining centralized auth and tenant checks.
+- Hardened Dodo billing identity: checkout derives identity from the persistent
+  session, sends server-owned DataForge metadata, and recognized entitlement
+  webhooks fail closed without `metadata.dataforge_user_id`; provider customer
+  IDs remain separate.
+- Regenerated route inventory/auth artifacts with no unknown auth or tenant rows;
+  corrected API and validation documentation for the new route/config surface.
+- Corrected field-level golden scoring to pair records by identity before exact
+  value comparison; added regression coverage for value permutations.
+- Isolated xdist identity/session SQLite paths per worker, made insight-engine
+  mocks survive module reloads, and reconciled the stale API-key RBAC test with
+  the customer-wedge contract.
+- Updated vulnerable Python and npm lockfile dependencies. `pip-audit` and
+  `npm audit` now report no known vulnerabilities.
+
+### Fresh evidence
+
+| Command | Exit | Result |
+| --- | ---: | --- |
+| `python3 scripts/validate_local.py --quick --json` | 0 | 14/14 checks passed; run `20260819T113900Z_quick` |
+| `python3 scripts/validate_local.py --full --json` | 0 | 25/25 checks passed; run `20260819T113038Z_full`; backend full suite and Docker smoke passed |
+| `PYTHONPATH=backend .venv/bin/python -m pytest -n auto --dist loadfile backend/tests/test_dodo_billing.py backend/tests/test_insight_engine.py backend/tests/test_research_leak_tracking.py backend/tests/test_rbac.py -q` | 0 | Targeted suites passed under xdist |
+| `python3 scripts/run_dodo_billing_e2e.py` | 0 | Deterministic signup → checkout → webhook → quota block → hold → resume loop: 16 checks green |
+| `python3 scripts/verify_docs_match_code.py` | 0 | Routes and environment variables match code |
+| `python3 scripts/generate_route_inventory.py` | 0 | 203 routes: 168 stable, 35 experimental |
+| `python3 scripts/generate_route_auth_matrix.py` | 0 | 188 rows; `unknown_auth=0`, `unknown_tenant=0` |
+| `npm audit --audit-level=moderate` | 0 | 0 vulnerabilities after six transitive lockfile updates |
+| `npm test` / `npm run lint` | 0 | 36 frontend files, 458 tests; JS/CSS lint clean |
+| `python3 scripts/docs_lint.py` | 0 | 141 stable routes match `docs/API.md` |
+| `git diff --check` | 0 | No whitespace errors |
+
+The full local gate intentionally does not prove opt-in Postgres/browser/live
+network/golden-dataset acceptance or a deployed HTTPS environment.
+
+### Remaining external blockers
+
+- **E1.2–E1.5:** public staging VPS/DNS/TLS, Postgres, staging secrets, backup/
+  restore execution, real notification delivery, and uptime evidence.
+- **E2.3 acceptance:** real Dodo test credentials plus a staging checkout/webhook
+  transcript; the repository mock loop is not payment-provider proof.
+- **E2.5:** owner lawyer review of Terms, Privacy, and AUP before beta.
+- **E4.3–E4.4:** five real ICP beta users, their successful scheduled exports,
+  and evidence-backed findings. No assumptions or fabricated feedback were added.
+
+These are recorded as owner-blocked in `docs/EXECUTION_PLAN.md`; no safe
+repository-only task remains in the current plan.
 
 ## Session 97g - E5.3 Docs Collapse (2026-08-18)
 
@@ -5449,3 +6250,41 @@ All 62 pass; full notification + sitemap test suites (existing 73 + 42)
 remain green.
 
 Verified: 62/62 new pass; combined existing suites all green.
+
+
+## Laptop software update verification — 2026-10-04
+
+Scope: update installed container runtimes/dependencies while retaining deployed application behavior and the existing unrelated dirty source edits.
+
+- `python3 scripts/validate_local.py --quick`: exit0 before and after Compose/runtime changes; private evidence `/home/harshit/work/software-update-20261004/dataforge-baseline.log` and `dataforge-after-updates-quick.log`.
+- `python3 -m pytest backend/tests/test_nginx_keepalive_requests_pin.py backend/tests/test_docker_nginx_tls_ingress.py backend/tests/test_nginx_security_headers_hardened.py backend/tests/test_nginx_admin_acl.py backend/tests/test_nginx_method_rate_limit.py -q`: exit0,20 checks; log `dataforge-nginx-tests.log` in the same evidence directory.
+- Nginx image-only replacement script `dataforge-nginx-image-update.py check/apply`: exit0. Actual `nginx -v` is1.30.5; `nginx -t` exit0; `/health`, `/ready`, `/app/`200; `/api/admin`, `/metrics`404 through ingress. A separate container with Compose's minimal capability set passed the same HTTP checks. The initial ALL-only capability probe failed at cache-directory chown; Compose now restores CHOWN/SETUID/SETGID/NET_BIND_SERVICE.
+- PostgreSQL script `dataforge-postgres-image-update.py check/apply`: exit0. Fresh custom-format backup restores in isolated16.15 with12 public tables. Live server16.15 reuses the original volume and cluster identifier; host settings preserved; `/health`, `/ready`, `/app/`200. Same Alpine3.23 base retained. Original containers and private backups retained.
+- `docker exec dataforge-scraper python -m pip check`: exit0, no broken requirements. Outdated inventory found46 packages; separate runtime/browser build has started from the deployed app image with the current dependency manifest, excluding unrelated source changes. It is not yet activated.
+- `dataforge-prometheus-token-fix.py`: exit0. Existing metrics403 was due to a stale container token. The live token/local deployment environment now match the application's configured token; DataForge scrape is up. Invalid bearer credentials still return403. Prometheus remains2.53.0 and the original monitoring database volume is retained.
+- Prometheus3.15.0 `promtool check config`: exit0,25 rules valid. Isolated candidate readiness/query/self+application scrapes pass;17 copied historical blocks are readable; alerts are not delivered by the candidate. This copy excludes live head/WAL and is not a full backup. Live format migration approval is pending. Temporary candidate container/volume removed.
+
+These checks make no public staging, external notification, payment, extraction-quality or production-readiness claim.
+
+### Completed application dependency/security update — 2026-10-04
+
+- Private context `dataforge-runtime-build`: `docker build -f Dockerfile.security --target runtime -t dataforge:dependencies-security-20261004 .` and the corresponding `--target validation` build: both exit0. Python3.12.15 and Debian security updates; h2=4.4.1/hpack=4.2.0. Final runtime image SHA25635ce4318324870a470a4605212c35c938653f59bf78ed7fbb70f489d5166835f.
+- `python3 -m pip_audit --no-deps --disable-pip --strict --progress-spinner off -r .../dataforge-runtime-installed-requirements.txt -f json`: exit0,73 published runtime packages,0 vulnerabilities,0 skips. Validation-image pip_audit also exit0/0 vulnerabilities; unpublished local DataForge package excluded. Logs/proofs are in the private software-update evidence directory.
+- `docker run --rm --name dataforge-dependency-tests-20261004 --network none --cpus 4 --memory 6g --shm-size 1g --security-opt no-new-privileges:true --cap-drop ALL dataforge:dependencies-validation-20261004 python -m pytest backend/tests -q --maxfail=8`: exit0,3706 pass/87 skip progress characters; exact-image acceptance proof retained. No real credentials or external model calls were used.
+- Fresh source comparison:243 deployed application Python files match the candidate. `python3 .../dataforge-app-image-update.py`: exit0; API/worker healthy,Python3.12.15,pipcheck clean,worker heartbeat passes,host settings retained. Separate predeployment PostgreSQL/role backups and original containers retained. Audit/source/test evidence is checked against the target image ID before mutation. Original image recovery tag retained; local latest tag now targets the verified runtime.
+- Post-activation HTTP: /health,/ready,/app/200; /api/admin,/metrics404 via ingress. Application Prometheus target up. Optional monitoring targets remain down because their services are inactive; no alert services started.
+- Source Dockerfile Python base updated to the same verified3.12.15/Trixie digest. `python3 scripts/validate_local.py --quick`: exit0; `python3 -m pytest backend/tests/test_dockerfile_playwright_pin.py backend/tests/test_docker_dev_target.py backend/tests/test_docker_security_hardening.py -q` under isolated test settings: exit0,23 passes. `git diff --check -- Dockerfile docker-compose.prod.yml docs/AGENT_TRUTH.md`: exit0.
+
+Four newer dependency releases remain outside parent bounds (g4f, multidict, pyee, Pydantic Core). Live Prometheus3 format migration still awaits explicit approval. No unrelated dirty application source was deployed, and no production-readiness claim is made.
+
+### User-approved Prometheus3 live migration — 2026-10-04
+
+The user explicitly approved the FreeLLM and Prometheus upgrades and skipped MATLAB.
+
+- `python3 /home/harshit/work/software-update-20261004/activate-prometheus-approved.py`: first attempt exit1; removing obsolete console flags broke a shell line continuation. Automatic rollback restored the2.53 service on its unchanged original volume. Corrected removal preserves full line continuations; retry exit0. Private activation/rollback logs retained.
+- A stopped cold clone copied all86 original database files, including head/WAL; before-migration manifest hash matches. Original `dataforge_prometheus_data` volume remains unchanged. Full archive320840192 bytes and original container retained. Active external volume name and image ID are recorded in `prometheus-approved-live-proof.json`.
+- Actual Prometheus version3.15.0; restart count0; DataForge and self scrapes up. A historical ten-minute `up{job="dataforge"}` range query matches the pre-stop result. `promtool check config /tmp/prometheus.yml`: exit0.
+- Source Compose pins the verified3.15.0 registry digest, removes deprecated console flags and uses the active cloned volume as external storage. `docker compose -f docker-compose.prod.yml -f docker-compose.override.local.yml config --format json` with placeholder interpolation values: exit0; selected image/volume/command checks pass. No secrets printed.
+- `python3 scripts/validate_local.py --quick`: exit0 after migration; evidence `dataforge-after-prometheus3-quick.log`. Optional inactive monitoring services remain inactive.
+
+FreeLLM approved activation also passed: sourcec4c1dc3,39 migrations,7 saved encrypted key records/86 valid profile links/model IDs/existing settings unchanged;3 pre-existing dangling links removed;integrity ok/FK0,HTTP boundaries pass,NRestarts0. Its separate paired recovery backup is recorded in `freellm-approved-live-proof.json`.

@@ -52,6 +52,10 @@ export default async function globalSetup() {
   const resp = await ctx.post("/api/session", {
     headers: { "X-API-Key": apiKey },
   });
+  if (!resp.ok() && process.env.DATAFORGE_E2E_ALLOW_SESSIONLESS === "true") {
+    await resp.dispose();
+    return;
+  }
   if (!resp.ok()) {
     const body = await resp.text();
     throw new Error(`Auth failed for ${baseURL} (status=${resp.status()}): ${body.slice(0, 200)}`);

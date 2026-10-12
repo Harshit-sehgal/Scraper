@@ -301,11 +301,12 @@ def configure_exception_handlers(app: FastAPI) -> None:
         # ``logger.exception`` automatically captures the active
         # exception's traceback, so the previous manual ``format_exc``
         # is unnecessary here.
-        logger.exception(
+        logger.error(
             "Unhandled exception (%s): %s trace_id=%s",
             type(exc).__name__,
             exc,
             trace_id,
+            exc_info=exc,
         )
         # The client never sees the full message — they would otherwise
         # leak stack frames. The ``error_class`` field was removed in

@@ -289,17 +289,35 @@ select.input:focus {
 
 .input::placeholder,
 .text-input::placeholder,
-.textarea-input::placeholder {
+.textarea-input::placeholder,
+textarea::placeholder {
   color: var(--ink-4);
+  opacity: 1;
 }
 
 .textarea-input,
-textarea.input {
+textarea.input,
+#view-new textarea:not([hidden]) {
   height: auto;
-  min-height: 96px;
+  min-height: 112px;
   padding: var(--space-3);
-  line-height: var(--leading-snug);
+  line-height: var(--leading-relaxed);
   resize: vertical;
+  field-sizing: content;
+  overflow-y: auto;
+}
+
+#view-new textarea#inp-intent,
+#view-new textarea#inp-urls {
+  min-height: 128px;
+  font-size: var(--text-md);
+}
+
+#view-new textarea:focus,
+.textarea-input:focus,
+textarea.input:focus {
+  background: var(--bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-focus) 22%, transparent);
 }
 
 .input.field-mono {

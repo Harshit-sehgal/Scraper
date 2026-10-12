@@ -204,6 +204,26 @@ def _selector_css(sel_entry) -> str | None:
     return None
 
 
+def _select_node_targets(node: Any, selector: str) -> list[Any]:
+    """Select descendants, or the record node itself for the scoped sentinel."""
+    if selector.strip() == ":scope":
+        return [node]
+    return node.select(selector)
+
+
+def _read_scoped_list_item_text(target: Any) -> str:
+    """Read a list record's own text without nested list descendants."""
+    parts: list[str] = []
+    for child in target.children:
+        child_name = getattr(child, "name", None)
+        if child_name in {"ul", "ol"}:
+            continue
+        text = child if child_name is None else child.get_text(" ", strip=True)
+        if text and str(text).strip():
+            parts.append(str(text).strip())
+    return " ".join(parts)
+
+
 def build_selector_field_metadata(
     field_sels: dict[str, Any],
     schema_fields: list[SchemaField],
@@ -598,6 +618,8 @@ def _extract_context_window(text: str, keywords: list[str], max_len: int | None 
 def _read_node_value(target, field_type: FieldType | None = None, field_name: str = "") -> str | None:
     if field_type == FieldType.URL:
         return target.get("href")  # type: ignore[no-any-return]
+    if field_name == "text" and getattr(target, "name", None) == "li":
+        return _read_scoped_list_item_text(target)
     text_val = target.get_text(separator=" ", strip=True)
     title_val = target.get("title")
     alt_val = target.get("alt")
@@ -673,18 +695,27 @@ def extract_raw_from_selectors(
         sorted_fields = sorted(field_sels.items(), key=_field_sort_key)
         for key, sel_entry in sorted_fields:
             sel = _selector_css(sel_entry)
-            val = None
+            val: Any = None
             if sel:
                 try:
-                    target = node.select_one(sel)
-                    if target:
-                        node_ftype: FieldType | None = None
-                        if isinstance(sel_entry, dict) and sel_entry.get("type"):
-                            try:
-                                node_ftype = FieldType(sel_entry["type"])
-                            except ValueError:
-                                node_ftype = None
-                        val = _read_node_value(target, node_ftype, key)
+                    node_ftype: FieldType | None = None
+                    if isinstance(sel_entry, dict) and sel_entry.get("type"):
+                        try:
+                            node_ftype = FieldType(sel_entry["type"])
+                        except ValueError:
+                            node_ftype = None
+                    if node_ftype == FieldType.LIST_STRING:
+                        values = []
+                        for target in _select_node_targets(node, sel):
+                            item_value = _read_node_value(target, node_ftype, key)
+                            if item_value not in (None, ""):
+                                values.append(item_value)
+                        val = values or None
+                    else:
+                        targets = _select_node_targets(node, sel)
+                        target = targets[0] if targets else None
+                        if target:
+                            val = _read_node_value(target, node_ftype, key)
                 except (RuntimeError, OSError, ValueError, TypeError, KeyError, IndexError, AttributeError) as e:
                     logger.debug("[SelectorEngine] Invalid selector '%s' for %s: %s", sel, key, e)
             else:

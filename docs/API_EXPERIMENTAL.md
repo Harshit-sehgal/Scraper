@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-08-18 15:53:55 UTC
+**Generated:** 2026-10-08 18:37:48 UTC
 **Mode:** experimental routes **enabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=true`).
 **Verification command:**
 
@@ -228,6 +228,7 @@ For the diff between stable and experimental, see
 | POST | `/api/saas/email-verification/send` |
 | POST | `/api/saas/email-verification/verify` |
 | POST | `/api/saas/invitations/{invitation_id}/respond` |
+| POST | `/api/saas/login` |
 | POST | `/api/saas/orgs` |
 | POST | `/api/saas/orgs/{org_id}/invitations` |
 | POST | `/api/saas/password-reset/request` |
@@ -247,4 +248,4 @@ For the diff between stable and experimental, see
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 187
+**Total routes:** 188

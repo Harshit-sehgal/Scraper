@@ -107,3 +107,11 @@ class TestLiveBenchmarkGovernance:
             "test_accuracy.py",
         ):
             assert filename in run_benchmarks, f"{filename} missing from run_benchmarks.sh"
+
+    def test_live_benchmark_regression_capture_is_ephemeral(self) -> None:
+        """Live runs must not archive failures into tracked test fixtures."""
+        from app import scraper
+        from benchmarks.test_benchmark_smoke import _isolated_regression_capture
+
+        with _isolated_regression_capture() as capture:
+            assert scraper.get_regression_capture() is capture

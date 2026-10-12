@@ -4,10 +4,10 @@ Requires Docker to be running. These tests are behind the '-m postgres' marker
 and are skipped by default during CI.
 
 Run with:
-    python3 -m pytest backend/tests/test_postgres_integration.py -m postgres -v
+    python3 -m pytest backend/tests/test_postgres_integration.py -m postgres -v --run-postgres
 
 Or to run all postgres-marked tests:
-    python3 -m pytest -m postgres -v
+    python3 -m pytest -m postgres -v --run-postgres
 """
 
 import logging
@@ -24,41 +24,36 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="module")
 def postgres_container():
-    """Start a Postgres container or reuse a running one."""
-    import socket
+    """Start an isolated Postgres container unless a disposable DSN is explicit.
 
-    use_running = False
-    dsn = os.environ.get("DATAFORGE_DATABASE_URL")
-    if dsn:
-        use_running = True
-    else:
-        try:
-            with socket.create_connection(("127.0.0.1", 5432), timeout=1):
-                use_running = True
-                os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-                os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
-        except (TimeoutError, ConnectionRefusedError):
-            pass
-
+    Do not infer that an arbitrary service on host port 5432 is a test
+    database: using hard-coded credentials there can either fail noisily or,
+    worse, allow destructive cleanup statements to target another project.
+    ``DATAFORGE_TEST_POSTGRES_URL`` is the deliberate opt-in for an externally
+    managed disposable database.
+    """
+    explicit_dsn = os.environ.get("DATAFORGE_TEST_POSTGRES_URL")
     reset_repository()
-    if use_running:
+    if explicit_dsn:
+        os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+        os.environ["DATAFORGE_DATABASE_URL"] = explicit_dsn
         yield
         reset_repository()
-        if not dsn:
-            os.environ.pop("DATAFORGE_DATABASE_URL", None)
-            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-    else:
-        from testcontainers.postgres import PostgresContainer
+        os.environ.pop("DATAFORGE_DATABASE_URL", None)
+        os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+        return
 
-        with PostgresContainer("postgres:16-alpine") as pg:
-            database_url = pg.get_connection_url().replace("+psycopg2", "")
-            os.environ["DATAFORGE_DATABASE_URL"] = database_url
-            os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-            reset_repository()
-            yield
-            reset_repository()
-            os.environ.pop("DATAFORGE_DATABASE_URL", None)
-            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+    from testcontainers.postgres import PostgresContainer
+
+    with PostgresContainer("postgres:16-alpine") as pg:
+        database_url = pg.get_connection_url().replace("+psycopg2", "")
+        os.environ["DATAFORGE_DATABASE_URL"] = database_url
+        os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+        reset_repository()
+        yield
+        reset_repository()
+        os.environ.pop("DATAFORGE_DATABASE_URL", None)
+        os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
 
 
 @pytest.fixture

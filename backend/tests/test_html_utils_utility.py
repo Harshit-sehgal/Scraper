@@ -202,6 +202,14 @@ class TestValidPhone:
 
 
 class TestSanitizeFieldValue:
+    def test_boolean_normalizes_common_availability_labels(self) -> None:
+        schema_field = SchemaField(name="availability", field_type=FieldType.BOOLEAN)
+
+        assert _sanitize_field_value(schema_field, "In stock") is True
+        assert _sanitize_field_value(schema_field, "Available") is True
+        assert _sanitize_field_value(schema_field, "Out of stock") is False
+        assert _sanitize_field_value(schema_field, "Unavailable") is False
+
     def test_none_returns_none(self) -> None:
         schema_field = SchemaField(name="name", field_type=FieldType.STRING)
         assert _sanitize_field_value(schema_field, None) is None

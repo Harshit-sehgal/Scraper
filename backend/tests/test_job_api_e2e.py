@@ -174,6 +174,10 @@ async def test_job_api_network_payload_extraction(e2e_browser_server, tmp_path, 
             "mode": "manual",
             "urls": [target_url],
             "schema_fields": schema,
+            # Network-payload assertions require the browser capture
+            # path; auto-selection may legitimately choose HTTPX for the
+            # HTML shell and therefore observe no fetch/XHR response.
+            "fetch_strategy": "playwright_full",
         },
     )
 

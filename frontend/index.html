@@ -10,7 +10,7 @@
     <title>DataForge</title>
     <meta name="description" content="Web extraction dashboard for supported accessible pages." />
     <link rel="icon" type="image/svg+xml" href="/app/favicon.svg" />
-    <link rel="stylesheet" href="/app/styles.css?v=7" />
+    <link rel="stylesheet" href="/app/styles.css?v=8" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -22,6 +22,7 @@
           <button
             type="button"
             class="sidebar-toggle icon-btn"
+            id="sidebar-collapse"
             data-action="toggle-sidebar"
             aria-label="Toggle sidebar"
           >
@@ -897,6 +898,7 @@
                   <button
                     type="button"
                     class="toggle active"
+                    id="inp-mode-manual"
                     data-mode="manual"
                     data-action="set-mode"
                     aria-label="Manual URLs mode"
@@ -906,6 +908,7 @@
                   <button
                     type="button"
                     class="toggle"
+                    id="inp-mode-auto"
                     data-mode="auto"
                     data-action="set-mode"
                     aria-label="Auto Discover mode"
@@ -951,6 +954,7 @@
 
               <!-- Manual Mode: URLs -->
               <div class="section" id="section-manual">
+                <span id="url-section" class="sr-only">Manual target URL section</span>
                 <label class="section-label" for="inp-urls"
                   >Target URLs <span class="hint">one per line, up to 100</span></label
                 >
@@ -1048,7 +1052,7 @@
               </div>
 
               <!-- Schema -->
-              <div class="section">
+              <div class="section" id="schema-section">
                 <label class="section-label" for="inp-source-policy">Source Coverage Policy</label>
                 <select id="inp-source-policy" aria-label="Source coverage policy">
                   <option value="official_plus_directory" selected>Official + Directory (recommended)</option>
@@ -1060,7 +1064,7 @@
                 </p>
               </div>
 
-              <div class="section">
+              <div class="section" id="schema-fields-section">
                 <label class="section-label">Data Schema</label>
                 <p class="hint-block">Define the columns of data you want extracted</p>
                 <div id="schema-container"></div>
@@ -1138,6 +1142,17 @@
                 </select>
                 <p class="hint-block mt-1">
                   <a href="#" data-action="switch-view" data-view="auth-profiles" class="hint">Manage auth profiles</a>
+                </p>
+              </div>
+
+              <!-- Schedule -->
+              <div class="section" id="schedule-section">
+                <div class="section-head-row">
+                  <label class="section-label">Schedule</label>
+                  <span class="hint">optional</span>
+                </div>
+                <p class="hint-block">
+                  Run manually by default. Scheduled monitoring can be configured after creating a job.
                 </p>
               </div>
 
@@ -2640,6 +2655,6 @@
          FastAPI's StaticFiles mount at /app serves these files from the
          frontend/ directory. Production nginx deployments are unaffected
          (nginx has dedicated location blocks for both /app/ and root paths). -->
-    <script type="module" src="/app/app.js?v=6"></script>
+    <script type="module" src="/app/app.js?v=7"></script>
   </body>
 </html>

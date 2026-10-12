@@ -7,7 +7,7 @@ All tool-calls must be traceable and governed by the Substrate Policy Engine.
 import asyncio
 import json
 import logging
-import subprocess
+import subprocess  # nosec B404 -- sandboxed plugin execution uses a fixed argv vector below
 import sys
 import threading
 from collections.abc import Callable

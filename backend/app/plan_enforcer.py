@@ -71,9 +71,10 @@ def get_plan_limits(tier: str) -> dict[str, Any]:
 def _user_tier(user_id: str) -> str:
     """Return the user's subscription tier.
 
-    Checks the local subscription store first. If not found, uses the PayPal
-    billing service for real tier lookups. Falls back to "free" when billing is
-    not configured or when the tier is not recognised.
+    Checks the local subscription store first. Dodo webhook events populate
+    that store using the internal DataForge user id. The legacy PayPal service
+    remains a compatibility fallback for older records. Falls back to "free"
+    when billing is not configured or when the tier is not recognised.
     """
     try:
         from app.billing.webhooks import get_customer_subscription

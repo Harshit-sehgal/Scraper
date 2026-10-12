@@ -18,7 +18,7 @@ dependencies = [
     "fastapi>=0.110.0,<1.0.0",
     "uvicorn[standard]>=0.27.0,<1.0.0",
     "pydantic>=2.5.0,<3.0.0",
-    "pydantic-settings>=2.1.0,<3.0.0",
+    "pydantic-settings>=2.14.2,<3.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
     "playwright>=1.45.0,<2.0.0",
     "httpx>=0.27.0,<1.0.0",
@@ -38,8 +38,8 @@ dependencies = [
     "geopy>=2.4.0,<3.0.0",
     "prometheus-client>=0.19.0,<1.0.0",
     "aiofiles>=23.0.0,<26.0.0",
-    "aiohttp>=3.9.0,<4.0.0",
-    "cryptography>=42.0.0,<50.0.0",
+    "aiohttp>=3.14.3,<4.0.0",
+    "cryptography>=50.0.0,<51.0.0",
     "requests>=2.31.0,<3.0.0",
     "paypal-checkout-sdk>=1.2.0,<2.0.0"
 ]
@@ -93,6 +93,12 @@ ignore = [
     "PLW0406",
     # Complexity rules — pre-existing high-complexity functions
     "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915",
+    # Too many positional arguments — sibling of PLR0913; callback/protocol
+    # signatures and legacy constructors legitimately exceed 5 positional args.
+    "PLR0917",
+    # Copyright headers — the repo carries one LICENSE/THIRD_PARTY_NOTICES file
+    # rather than per-file copyright notices.
+    "CPY001",
     # Boolean positional arguments — API patterns
     "FBT001", "FBT002", "FBT003",
     # Pathlib suggestions — codebase uses os.path in many places
@@ -157,9 +163,19 @@ check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 # The ``ignore_errors = true`` override was removed in Round 24 because it
-# silently hid type errors across 7 modules. The override section is
-# intentionally empty — if project constraints later require one, prefer
-# a narrow ``disable_error_code = ["..."]`` over blanket suppression.
+# silently hid type errors across 7 modules. Keep overrides narrow — prefer
+# ``disable_error_code`` or a single-library exception over blanket suppression.
+#
+# bs4 >= 4.13 ships inline type hints that reject valid dynamic attribute
+# patterns this codebase relies on (for example
+# ``tag.find_all("div", {"class": re.compile(...)})``); the separate
+# ``types-beautifulsoup4`` stubs do not model those either. bs4 is exercised by
+# the runtime test suite, so treat its inline types as untyped here and keep the
+# mypy gate meaningful for first-party code instead of chasing incomplete
+# upstream annotations.
+[[tool.mypy.overrides]]
+module = ["bs4"]
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests", "backend/benchmarks"]

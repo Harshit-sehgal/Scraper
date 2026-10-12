@@ -110,9 +110,11 @@ class CommunicationSettings(BaseSettings):
 
     # ─── CAPTCHA Solver ────────────────────────────────────────────────
     CAPTCHA_SOLVER_ENABLED: bool = False
-    """Master switch for CAPTCHA solving integration. When True, the
-    recovery pipeline will attempt to solve detected CAPTCHAs before
-    falling through to proxy rotation + backoff."""
+    """Deprecated integration switch; must remain false.
+
+    DataForge does not bypass CAPTCHAs or other access controls. Protected
+    pages fail closed and are surfaced for authorized human intervention.
+    """
     CAPTCHA_PROVIDER: str = "2captcha"
     """CAPTCHA solver backend: '2captcha' or 'anticaptcha'."""
     CAPTCHA_API_KEY: str = ""
@@ -122,10 +124,11 @@ class CommunicationSettings(BaseSettings):
 
     # ─── Cloudflare Harvester ──────────────────────────────────────────
     CF_HARVESTER_ENABLED: bool = False
-    """Enable Cloudflare cf_clearance cookie harvesting. When True and a
-    Cloudflare challenge is detected, a dedicated browser context is
-    opened to wait for the JS challenge to auto-resolve and the resulting
-    cf_clearance cookie is persisted for subsequent requests."""
+    """Deprecated integration switch; must remain false.
+
+    DataForge does not harvest challenge-clearance cookies or bypass
+    Cloudflare access controls.
+    """
     CF_HARVESTER_TIMEOUT_S: float = 30.0
     """Maximum seconds to wait for cf_clearance cookie after navigating
     to a Cloudflare challenge page."""

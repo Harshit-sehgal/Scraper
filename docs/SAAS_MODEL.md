@@ -29,10 +29,15 @@ POST /api/saas/signup  →  SignupService.signup()
   ├─ Creates default Organization ("{user}'s workspace")
   ├─ Creates default Project ("default")
   ├─ Creates OWNER Membership for user in org
+  ├─ Issues an HTTP-only `dataforge_session` cookie scoped to the new tenant
   └─ Returns { user_id, email, organization_id, project_id }
 ```
 
-The signup endpoint is explicitly public (no auth required). After signup, the user must accept the AUP via `POST /api/saas/aup/accept`.
+The signup endpoint is explicitly public (no auth required). Returning users use
+`POST /api/saas/login`, which selects an active membership/project from the
+identity store and issues the same tenant-scoped session cookie. After signup
+or login, the user must accept the AUP via `POST /api/saas/aup/accept` before
+protected creation/mutation actions.
 
 ---
 
@@ -104,7 +109,7 @@ Access checks use the centralized `can_access_scoped_resource()` helper in `app.
 ## 7. Acceptable Use Policy (AUP)
 
 - Current AUP version: `2026-06-11-v1`
-- Users must accept the AUP before performing protected actions (enforcement point: future).
+- Users must accept the AUP before performing protected creation/mutation actions.
 - AUP acceptance is tracked with `aup_accepted_at` and `aup_version_accepted`.
 - Re-accepting the same version is idempotent (keeps first timestamp).
 - Accepting a new version updates both timestamp and version.
@@ -123,12 +128,14 @@ Access checks use the centralized `can_access_scoped_resource()` helper in `app.
 
 ## 9. What Is Built vs What Is Still Unproven
 
-Correction 2026-08-18 (E0.2): this section previously listed PayPal
-integration and plan enforcement as "not yet implemented". That is
-stale. The current checkout contains:
+Correction 2026-08-19: the active checkout provider is Dodo Payments. PayPal
+code remains as a legacy compatibility path, but the frontend and production
+environment gate use Dodo.
 
-- **Billing module**: `backend/app/billing/` — `checkout.py`, `webhooks.py`,
-  `service.py`, `models.py` (PayPal migration flow).
+- **Billing module**: `backend/app/billing/dodo.py` implements hosted checkout,
+  Standard-Webhooks verification, idempotency, internal-user metadata mapping,
+  and reconciliation. `webhooks.py` is the durable entitlement store; the
+  older PayPal modules remain compatibility code.
 - **Quota/plan enforcement**: `_enforce_api_auth_and_quota` in
   `backend/app/middlewares.py` plus `backend/app/plan_enforcer.py`
   (`_PLAN_LIMITS`), wired into job creation and export paths.
@@ -138,17 +145,18 @@ stale. The current checkout contains:
 
 **Still unproven (not implemented or not end-to-end verified):**
 
-- PayPal sandbox end-to-end: signup → checkout → webhook → entitlement
-  flip → limit → upgrade → resume. This is `docs/EXECUTION_PLAN.md`
-  task E2.3.
+- Dodo sandbox/staging end-to-end: signup → checkout → webhook → entitlement
+  flip → limit → upgrade → resume. The mocked money-loop and unit tests pass;
+  real provider credentials and staging evidence remain `E2.3` owner work.
 - Plan hard-stop (403 on job creation at tier limit) verified
   end-to-end against a deployed environment (E2.1).
 - Usage metering confirmed against the PRD §4 pricing metric (page
   fetches/month) with no double counting (E2.2).
-- Email verification on signup (partial frontend exists; flow not
-  proven end-to-end).
-- Password reset flow.
+- Email verification on signup (token generation exists; delivery and the
+  complete browser flow are not proven).
+- Password reset delivery (tokens are generated, but a real mail provider and
+  complete browser flow are not proven).
 - Postgres parity for the identity store.
 - Frontend account/workspace management pages.
-- AUP enforcement at protected-action time (acceptance tracking exists;
-  enforcement point remains future).
+- Deployed HTTPS staging evidence, backups/restore, real alert delivery, and
+  uptime evidence required by `docs/EXECUTION_PLAN.md` Phase 1.

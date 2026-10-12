@@ -75,8 +75,11 @@ _PUBLIC_API_PATHS: frozenset[str] = frozenset(
         "/api/saas/password-reset/reset",
         # Self-service signup is intentionally public.
         "/api/saas/signup",
-        # Billing webhooks are called by PayPal/Stripe, which do not carry DataForge keys.
+        # Billing webhooks are called by PayPal/Stripe/Dodo, which do not carry DataForge keys.
         "/api/billing/webhook",
+        "/api/billing/dodo/webhook",
+        # Password login is the other unauthenticated half of self-service auth.
+        "/api/saas/login",
     }
 )
 

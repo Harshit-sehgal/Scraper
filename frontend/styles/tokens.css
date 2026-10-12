@@ -28,8 +28,8 @@
   /* Ink — 4-tier (Industrial high-contrast) */
   --ink-1: #171717; /* titles */
   --ink-2: #171717; /* body */
-  --ink-3: #737373; /* subtle */
-  --ink-4: #737373; /* placeholder */
+  --ink-3: #5f6368; /* secondary text; readable on white */
+  --ink-4: #62676d; /* placeholder; readable while remaining subdued */
   --ink-inverse: #fff;
   --ink-link: #3b5b7e; /* primary steel blue */
 
@@ -38,8 +38,8 @@
   --primary-hover: #224365; /* PRD Tailwind config primary-hover (#224365) */
 
   /* Borders */
-  --border: #e5e5e5;
-  --border-strong: #c3c6cf;
+  --border: #d5d9df;
+  --border-strong: #9aa3af;
   --border-focus: #3b5b7e;
 
   /* Spacing — 4px base */

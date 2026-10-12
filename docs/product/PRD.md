@@ -88,10 +88,14 @@ correlate linearly with customer value.
 | **Free** | 1,000 | 1 | 10,000 records | CSV only | 100 | 7 days |
 | **Starter** | 10,000 | 5 | 100,000 records | CSV, JSON | 1,000 | 30 days |
 | **Pro** | 100,000 | 25 | 1,000,000 records | CSV, JSON, Excel | 10,000 | 90 days |
-| **Business** | 1,000,000 | 100 | 10,000,000 records | All formats + batch | 100,000 | 180 days |
+| **Enterprise** | 1,000,000 | 100 | 10,000,000 records | All formats + batch | 100,000 | 180 days |
 
 **Overages:** Hard-stop at tier limit for Free/Starter (403 on job creation).
-Pro/Business can configure automatic upgrade or hard-stop.
+Pro/Enterprise can configure automatic upgrade or hard-stop.
+
+Reference prices for the current Dodo catalog are Free $0, Starter $15/month,
+Pro $29/month, and Enterprise custom pricing. Product IDs and real prices are
+configured in Dodo, not inferred from this document.
 
 > Implementation note (2026-08-18): quota rejections return HTTP 429
 > (Too Many Requests, per RFC 6585), matching the codebase-wide
@@ -104,7 +108,7 @@ Pro/Business can configure automatic upgrade or hard-stop.
 | Free | 10 | 100 |
 | Starter | 60 | 1,000 |
 | Pro | 300 | 10,000 |
-| Business | 1,000 | 60,000 |
+| Enterprise | 1,000 | 60,000 |
 
 ---
 
@@ -150,14 +154,14 @@ Pro/Business can configure automatic upgrade or hard-stop.
 
 ## 6. Feature Tier Table
 
-| Feature | Free | Starter | Pro | Business |
-|---------|:----:|:-------:|:---:|:--------:|
+| Feature | Free | Starter | Pro | Enterprise |
+|---------|:----:|:-------:|:---:|:----------:|
 | Schema-guided extraction | ✅ | ✅ | ✅ | ✅ |
 | CSV export | ✅ | ✅ | ✅ | ✅ |
 | JSON export | — | ✅ | ✅ | ✅ |
 | Excel export | — | — | ✅ | ✅ |
 | Batch export | — | — | — | ✅ |
-| Scheduled jobs | — | — | ✅ | ✅ |
+| Scheduled jobs | ✅ | ✅ | ✅ | ✅ |
 | Webhook notifications | — | ✅ | ✅ | ✅ |
 | Custom schemas | ✅ | ✅ | ✅ | ✅ |
 | Team members | — | 3 | 10 | Unlimited |

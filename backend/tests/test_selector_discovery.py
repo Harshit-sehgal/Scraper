@@ -128,6 +128,15 @@ class TestBuildSelectorPrompt:
     def test_with_empty_schema(self) -> None:
         snippet = "<div>data</div>"
         prompt = build_selector_prompt(snippet, [])
+        assert isinstance(prompt, str)
+
+    def test_prompt_treats_schema_as_the_output_contract(self) -> None:
+        snippet = "<div class='item'><span class='title'>Widget</span></div>"
+        schema = [SchemaField(name="product_name", field_type=FieldType.STRING, description="", required=False)]
+        prompt = build_selector_prompt(snippet, schema)
+        assert "only" in prompt.lower()
+        assert "requested" in prompt.lower()
+        assert "add any extra columns" not in prompt.lower()
         assert "USER SCHEMA:" in prompt
         assert "JSON" in prompt
 

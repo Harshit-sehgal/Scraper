@@ -184,6 +184,60 @@ class TestAsyncPaginateLoadMore:
         result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
         assert result.stopped_reason is not None
 
+    async def test_waits_for_existing_hidden_button_to_become_visible(self, monkeypatch):
+        """A DOM-present button may become visible after an async page update."""
+        from app import pagination_executor
+
+        monkeypatch.setattr(pagination_executor, "LOAD_MORE_VISIBILITY_WAIT_SECONDS", 0.01, raising=False)
+        monkeypatch.setattr(pagination_executor, "LOAD_MORE_VISIBILITY_POLL_INTERVAL_SECONDS", 0, raising=False)
+
+        button = MagicMock()
+        button.first = button
+        button.count = AsyncMock(return_value=1)
+        button.is_visible = AsyncMock(side_effect=[False, False, True])
+        button.click = AsyncMock()
+
+        page = _make_mock_page()
+        page.locator = MagicMock(return_value=button)
+        config = PaginationConfig(
+            strategy="load_more",
+            max_pages=1,
+            delay_between_pages=0,
+            selector="#load-more",
+        )
+
+        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+
+        assert button.click.await_count == 1
+        assert result.pages_scraped == 1
+
+    async def test_deduplicates_records_across_full_page_snapshots(self):
+        """Load-more extraction must not re-emit cards seen before a click."""
+        page = _make_mock_page(locator_visible=True)
+        page.locator.return_value.first.count = AsyncMock(return_value=1)
+        snapshots = iter(
+            [
+                [{"id": "seed"}, {"id": "first"}],
+                [{"id": "seed"}, {"id": "first"}, {"id": "second"}],
+                [{"id": "seed"}, {"id": "first"}, {"id": "second"}, {"id": "third"}],
+            ],
+        )
+
+        async def extract_snapshot(_page: Any) -> list[dict]:
+            return next(snapshots)
+
+        config = PaginationConfig(
+            strategy="load_more",
+            max_pages=3,
+            delay_between_pages=0,
+            stop_on_duplicates=True,
+        )
+
+        result = await async_paginate(page, config, extract_fn=extract_snapshot)
+
+        assert [record["id"] for record in result.records] == ["seed", "first", "second", "third"]
+        assert result.duplicates_removed == 5
+
 
 class TestAsyncPaginatePageNumber:
     """Tests for async page-number pagination strategy."""
@@ -386,13 +440,16 @@ class TestAsyncPaginateScrollLoadMoreExecutors:
         page.evaluate = AsyncMock(return_value=1000)
         page.wait_for_function = AsyncMock()
 
+        async def extract_progressive(_page: Any) -> list[dict]:
+            return [{"title": f"Item {call_state['calls']}"}]
+
         config = PaginationConfig(
             strategy="load_more",
             max_pages=10,
             delay_between_pages=0,
         )
 
-        result = await async_paginate(page, config, extract_fn=_dummy_extract_fn)
+        result = await async_paginate(page, config, extract_fn=extract_progressive)
         assert result.stopped_reason in ("button_gone", "max_pages")
         assert result.error is None or "button" in (result.error or "").lower()
 

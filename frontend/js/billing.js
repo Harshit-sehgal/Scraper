@@ -5,25 +5,21 @@
 import { apiFetch } from "./api.js";
 import { toast } from "./utils.js";
 
-// FU-2026-07-05 (LOW open-redirect hardening): only HTTPS URLs on
-// known PayPal hosts (or the documented dev sandbox.example.com) are
+// Only HTTPS URLs on known Dodo hosted-checkout hosts are
 // safe to redirect to. Rejecting anything else closes the gap where a
 // spoofed/MITM'd backend response could land the operator on a
 // javascript:/data:/foreign-https URL.
-const APPROVAL_URL_ALLOWED_HOSTS = new Set([
-  "www.paypal.com",
-  "paypal.com",
-  "www.sandbox.paypal.com",
-  "sandbox.paypal.com",
-  "sandbox.example.com",
-  "example.com",
+const CHECKOUT_URL_ALLOWED_HOSTS = new Set([
+  "checkout.dodopayments.com",
+  "test.dodopayments.com",
+  "live.dodopayments.com",
 ]);
 
 /**
- * Validate a server-returned PayPal approval URL before redirecting.
+ * Validate a server-returned Dodo checkout URL before redirecting.
  * Returns the URL when safe, else null.
  */
-function safeApprovalUrl(rawUrl) {
+function safeCheckoutUrl(rawUrl) {
   if (typeof rawUrl !== "string" || !rawUrl) return null;
   let parsed;
   try {
@@ -32,7 +28,7 @@ function safeApprovalUrl(rawUrl) {
     return null;
   }
   if (parsed.protocol !== "https:") return null;
-  if (!APPROVAL_URL_ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return null;
+  if (!CHECKOUT_URL_ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return null;
   return rawUrl;
 }
 
@@ -45,7 +41,7 @@ const TIER_LABELS = {
 
 /** Plan tier metadata for the comparison table.
  *
- * Matches the PLAN_LIMITS dict in backend/app/billing/service.py.
+ * Matches the PLAN_LIMITS dict in backend/app/plan_enforcer.py.
  * Prices in USD/month. Enterprise uses -1 (unlimited).
  */
 const PLANS = [
@@ -72,7 +68,7 @@ const PLANS = [
   {
     id: "starter",
     name: "Starter",
-    price: "$29",
+    price: "$15",
     period: "/month",
     description: "For growing teams with regular extraction needs",
     features: [
@@ -92,7 +88,7 @@ const PLANS = [
   {
     id: "pro",
     name: "Pro",
-    price: "$99",
+    price: "$29",
     period: "/month",
     description: "For organizations running extraction at scale",
     features: [
@@ -112,8 +108,8 @@ const PLANS = [
   {
     id: "enterprise",
     name: "Enterprise",
-    price: "$299",
-    period: "/month",
+    price: "Custom",
+    period: "",
     description: "For large-scale extraction with dedicated support",
     features: [
       { text: "Unlimited jobs", included: true },
@@ -131,9 +127,9 @@ const PLANS = [
   },
 ];
 
-/** Map the operator's currently-rendered tier label to a checkout tier id.
+/** Map the user's currently-rendered tier label to a checkout tier id.
  *
- * The PayPal dashboard recognises only ``starter`` / ``pro`` / ``enterprise``.
+ * Dodo recognises only ``starter`` / ``pro`` / ``enterprise``.
  * Returning ``null`` for unknown / empty tiers lets the caller refuse
  * with a clear toast instead of silently picking a wrong target.
  */
@@ -274,18 +270,16 @@ async function upgradeToTier(targetTier) {
   }
 
   const origin = window.location.origin || "";
-  const returnUrl = `${origin}${window.location.pathname || "/"}?paypal_return=1&tier=${encodeURIComponent(targetTier)}`;
-  const cancelUrl = `${origin}${window.location.pathname || "/"}?paypal_cancel=1`;
+  const returnUrl = `${origin}${window.location.pathname || "/"}?dodo_return=1&tier=${encodeURIComponent(targetTier)}`;
 
   let response;
   try {
-    response = await apiFetch("/api/billing/checkout", {
+    response = await apiFetch("/api/billing/dodo/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         plan_tier: targetTier,
         return_url: returnUrl,
-        cancel_url: cancelUrl,
       }),
     });
   } catch (err) {
@@ -306,13 +300,13 @@ async function upgradeToTier(targetTier) {
     return;
   }
 
-  const approvalUrl = payload?.approval_url;
-  if (!approvalUrl) {
-    toast("Checkout succeeded but no approval_url was returned.", "error");
+  const checkoutUrl = payload?.checkout_url;
+  if (!checkoutUrl) {
+    toast("Checkout succeeded but no checkout_url was returned.", "error");
     return;
   }
 
-  const safeUrl = safeApprovalUrl(approvalUrl);
+  const safeUrl = safeCheckoutUrl(checkoutUrl);
   if (!safeUrl) {
     toast("Checkout returned an unsafe redirect URL. Contact support.", "error");
     return;
@@ -355,8 +349,8 @@ export async function refreshBilling() {
 }
 
 export async function upgradePlan() {
-  // Read the currently-rendered tier so the operator's "upgrade" click
-  // stirs PayPal toward a sensible target (Free → Starter unless they
+  // Read the currently-rendered tier so the user's "upgrade" click
+  // starts Dodo checkout toward a sensible target (Free → Starter unless they
   // are already mid-funnel on a labelled tier).
   const tierEl = document.getElementById("billing-kpi-tier");
   const currentTier = tierEl ? tierEl.textContent.trim() : "";
@@ -368,18 +362,16 @@ export async function upgradePlan() {
   }
 
   const origin = window.location.origin || "";
-  const returnUrl = `${origin}${window.location.pathname || "/"}?paypal_return=1&tier=${encodeURIComponent(targetTier)}`;
-  const cancelUrl = `${origin}${window.location.pathname || "/"}?paypal_cancel=1`;
+  const returnUrl = `${origin}${window.location.pathname || "/"}?dodo_return=1&tier=${encodeURIComponent(targetTier)}`;
 
   let response;
   try {
-    response = await apiFetch("/api/billing/checkout", {
+    response = await apiFetch("/api/billing/dodo/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         plan_tier: targetTier,
         return_url: returnUrl,
-        cancel_url: cancelUrl,
       }),
     });
   } catch (err) {
@@ -401,16 +393,13 @@ export async function upgradePlan() {
     return;
   }
 
-  const approvalUrl = payload?.approval_url;
-  if (!approvalUrl) {
-    toast("Checkout succeeded but no approval_url was returned.", "error");
+  const checkoutUrl = payload?.checkout_url;
+  if (!checkoutUrl) {
+    toast("Checkout succeeded but no checkout_url was returned.", "error");
     return;
   }
 
-  // FU-2026-07-05: validate before redirecting. PayPal sandbox/stub
-  // URLs are sandbox.example.com / example.com — both are in the
-  // allowlist so the dev stub flow still redirects the operator.
-  const safeUrl = safeApprovalUrl(approvalUrl);
+  const safeUrl = safeCheckoutUrl(checkoutUrl);
   if (!safeUrl) {
     toast("Checkout returned an unsafe redirect URL. Contact support.", "error");
     return;

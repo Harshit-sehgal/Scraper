@@ -53,11 +53,16 @@ class TestPersistSingleWrapper:
 
     def test_saves_existing_job(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Saves a job that exists in jobs_store."""
+        import uuid
+
         from app.globals import jobs_store
         from app.models import Job
 
-        job = Job(name="test-job", id="test-id")
-        jobs_store["test-id"] = job
+        # A unique id keeps this test independent of other tests/background
+        # persistence tasks that share the process-wide jobs_store.
+        job_id = f"lifespan-persist-{uuid.uuid4().hex}"
+        job = Job(name="test-job", id=job_id)
+        jobs_store[job_id] = job
 
         from unittest.mock import MagicMock
 
@@ -65,8 +70,11 @@ class TestPersistSingleWrapper:
         mock_repo.save_single = MagicMock()
         monkeypatch.setattr("app.lifespan.get_job_repository", lambda: mock_repo)
 
-        persist_single_wrapper("test-id")
-        mock_repo.save_single.assert_called_once_with(job)
+        try:
+            persist_single_wrapper(job_id)
+            assert any(call.args == (job,) for call in mock_repo.save_single.call_args_list)
+        finally:
+            jobs_store.pop(job_id, None)
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,8 @@ patch ``resolve_auth_context`` to simulate different auth contexts.
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -27,7 +29,7 @@ from fastapi.testclient import TestClient
 
 # Holds the active ``_mock_auth_source`` patcher so the autouse
 # ``csrf_patch_cleanup`` fixture can stop it after each test.
-_ACTIVE_PATCHER: object | None = None
+_ACTIVE_PATCHER: Any | None = None
 
 
 @pytest.fixture
@@ -106,7 +108,7 @@ def _mock_auth_source(app: FastAPI | object, source: str) -> None:
 
 
 @pytest.fixture(autouse=True)
-def csrf_patch_cleanup() -> None:
+def csrf_patch_cleanup() -> Generator[None, None, None]:
     """Stop any active resolve_auth_context patcher after each test.
 
     Without this, the ``_mock_auth_source`` patcher survives across test

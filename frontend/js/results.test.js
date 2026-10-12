@@ -191,6 +191,19 @@ describe("renderTable()", () => {
     expect(thead.innerHTML).toContain("value");
     expect(thead.innerHTML).not.toContain("_hidden");
   });
+
+  it("renders only the requested schema fields when a schema is supplied", () => {
+    renderTable(
+      [{ product_name: "Widget", price: "$12", record_score: 0.98, source_url: "https://example.com/item" }],
+      "No results",
+      ["product_name", "price"],
+    );
+    const thead = document.getElementById("res-thead");
+    expect(thead.innerHTML).toContain("product_name");
+    expect(thead.innerHTML).toContain("price");
+    expect(thead.innerHTML).not.toContain("record_score");
+    expect(thead.innerHTML).not.toContain("source_url");
+  });
 });
 
 // ─── paginateRows ──────────────────────────────────────────────────────────

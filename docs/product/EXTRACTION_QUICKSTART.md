@@ -76,21 +76,17 @@ curl -X POST http://localhost:8000/api/workflows \
 ## 5. Schedule it
 
 Scheduled jobs run on cron and compare each run against the previous
-one (`GET /api/scheduled-jobs/{job_id}/changes` shows what changed):
+one (`GET /api/scheduled/{job_id}/changes` shows what changed):
 
 ```bash
-curl -X POST http://localhost:8000/api/scheduled-jobs \
+curl -X POST 'http://localhost:8000/api/scheduled?name=Books%20monitor&job_name=Books%20daily&frequency=daily&urls=https%3A%2F%2Fbooks.toscrape.com%2F' \
   -H "Authorization: Bearer $DATAFORGE_OPERATOR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "urls": ["https://books.toscrape.com/"],
-    "cron_expression": "0 6 * * *"
-  }'
+  -H "Accept: application/json"
 ```
 
 - `cron_expression` (5-field cron) takes precedence over `frequency`
   (`hourly` | `daily` | `weekly`).
-- Requires AUP acceptance; roles ADMIN or OPERATOR.
+- Requires AUP acceptance; authenticated tenant users can manage their own schedule.
 
 ## Limits and billing
 

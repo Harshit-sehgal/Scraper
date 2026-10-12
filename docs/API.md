@@ -87,9 +87,9 @@ This route list was generated from the FastAPI app during the audit. Production 
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
-| POST | `/api/discover` | Operator or admin |
+| POST | `/api/discover` | Authenticated user (AUP required) |
 | POST | `/api/discover/sitemap` | Operator or admin |
-| POST | `/api/schema/suggest` | Operator or admin |
+| POST | `/api/schema/suggest` | Authenticated user (AUP required) |
 | POST | `/api/url/analyze` | Operator or admin |
 
 ## Scraper/Telemetry Routes
@@ -170,6 +170,7 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 | Method | Path | Intended Access |
 | --- | --- | --- |
 | POST | `/api/saas/signup` | Public signup |
+| POST | `/api/saas/login` | Public login; sets an HTTP-only tenant session cookie |
 | GET | `/api/saas/me` | Authenticated user |
 | GET | `/api/saas/plan` | Authenticated user |
 | GET | `/api/saas/usage` | Authenticated user |
@@ -220,12 +221,12 @@ All scraper routes require operator or admin access. Read-only routes (GET) and 
 
 | Method | Path | Intended Access |
 | --- | --- | --- |
-| GET | `/api/scheduled` | Operator or admin |
-| POST | `/api/scheduled` | Operator or admin |
-| GET | `/api/scheduled/{job_id}` | Operator or admin |
-| PUT | `/api/scheduled/{job_id}` | Operator or admin |
-| DELETE | `/api/scheduled/{job_id}` | Operator or admin |
-| GET | `/api/scheduled/{job_id}/changes` | Operator or admin |
+| GET | `/api/scheduled` | Authenticated user (tenant-scoped) |
+| POST | `/api/scheduled` | Authenticated user (AUP required) |
+| GET | `/api/scheduled/{job_id}` | Authenticated user (tenant-scoped) |
+| PUT | `/api/scheduled/{job_id}` | Authenticated user (tenant-scoped) |
+| DELETE | `/api/scheduled/{job_id}` | Authenticated user (tenant-scoped) |
+| GET | `/api/scheduled/{job_id}/changes` | Authenticated user (tenant-scoped) |
 
 ## Billing and User Data Routes
 

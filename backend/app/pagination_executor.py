@@ -19,6 +19,7 @@ Chromium's networking stack is independent from ``httpx`` and so the
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -67,6 +68,11 @@ DEFAULT_MAX_PAGES = 10
 DEFAULT_MAX_RECORDS = 500
 DEFAULT_MAX_RUNTIME_SECONDS = 300
 DEFAULT_DELAY_BETWEEN_PAGES = 1.0
+# A matching load-more element can be rendered hidden and revealed by a
+# client-side timer or data request.  Wait only when the element is already in
+# the DOM; a genuinely absent button still stops immediately.
+LOAD_MORE_VISIBILITY_WAIT_SECONDS = 5.0
+LOAD_MORE_VISIBILITY_POLL_INTERVAL_SECONDS = 0.2
 
 
 class _ExtractionFailedSentinel:
@@ -454,6 +460,67 @@ async def _async_paginate_infinite_scroll(
     return result
 
 
+async def _locator_count(locator: Any) -> int | None:
+    """Return a locator's DOM match count when the Playwright API is present.
+
+    A few integrations provide lightweight locator shims that only implement
+    ``is_visible``.  ``None`` keeps those shims on the historical one-shot
+    visibility path while real Playwright locators get the hidden-element
+    polling behavior.
+    """
+    try:
+        count_result = locator.count()
+        if inspect.isawaitable(count_result):
+            count_result = await count_result
+        return count_result if isinstance(count_result, int) else None
+    except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError, TypeError):
+        return None
+
+
+async def _find_visible_load_more_button(
+    page: Any,
+    selectors: Sequence[str],
+    *,
+    visibility_deadline: float,
+) -> Any | None:
+    """Find a visible load-more button, waiting for an existing hidden node.
+
+    ``Locator.is_visible`` returns ``False`` immediately for a node that is
+    present but currently hidden.  Polling only locators with a positive
+    ``count`` distinguishes that state from an absent button, preserving the
+    fast ``button_gone`` result for pages that have no matching control.
+    """
+    while True:
+        dom_match_found = False
+        for selector in selectors:
+            try:
+                button = page.locator(selector).first
+                match_count = await _locator_count(button)
+                if match_count == 0:
+                    continue
+
+                if match_count is None:
+                    # Compatibility path for small page/locator shims that
+                    # do not implement Playwright's count() method.
+                    if await button.is_visible(timeout=1000):
+                        return button
+                    continue
+
+                dom_match_found = True
+                if await button.is_visible(timeout=0):
+                    return button
+            except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError, TypeError):
+                logger.debug("Load-more button probe failed for selector: %s", selector)
+
+        if not dom_match_found:
+            return None
+
+        remaining = visibility_deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        await asyncio.sleep(min(LOAD_MORE_VISIBILITY_POLL_INTERVAL_SECONDS, remaining))
+
+
 async def _async_paginate_load_more(
     page: Any,
     config: PaginationConfig,
@@ -467,6 +534,7 @@ async def _async_paginate_load_more(
     """
     result = PaginationResult()
     start_time = time.monotonic()
+    seen_fingerprints: set[str] = set()
 
     load_more_selectors = (
         [config.selector]
@@ -488,20 +556,21 @@ async def _async_paginate_load_more(
             result.stopped_reason = "timeout"
             break
 
-        # Try to find the load-more button
-        load_btn = None
-        for sel in load_more_selectors:
-            try:
-                btn = page.locator(sel).first
-                if await btn.is_visible(timeout=1000):
-                    load_btn = btn
-                    break
-            except (TimeoutError, RuntimeError, OSError, PlaywrightError, AttributeError):
-                logger.debug("Load-more button not found for selector: %s", sel)
-                continue
+        # Try to find the load-more button. A DOM-present but hidden control
+        # may be revealed by a client-side timer, so give it a short bounded
+        # polling window without delaying genuinely absent-button pages.
+        visibility_deadline = min(
+            start_time + config.max_runtime_seconds,
+            time.monotonic() + LOAD_MORE_VISIBILITY_WAIT_SECONDS,
+        )
+        load_btn = await _find_visible_load_more_button(
+            page,
+            load_more_selectors,
+            visibility_deadline=visibility_deadline,
+        )
 
         if load_btn is None:
-            result.stopped_reason = "button_gone"
+            result.stopped_reason = "timeout" if time.monotonic() - start_time >= config.max_runtime_seconds else "button_gone"
             break
 
         try:
@@ -528,6 +597,15 @@ async def _async_paginate_load_more(
         page_records = _extract_marker_and_count(page_records, result)
         if config.stop_on_duplicates:
             page_records, dupes = _remove_duplicates(page_records)
+            fresh_records: list[dict] = []
+            for record in page_records:
+                fingerprint = _make_record_fingerprint(record)
+                if fingerprint in seen_fingerprints:
+                    dupes += 1
+                    continue
+                seen_fingerprints.add(fingerprint)
+                fresh_records.append(record)
+            page_records = fresh_records
             result.duplicates_removed += dupes
 
         if not page_records and click_num > 0:

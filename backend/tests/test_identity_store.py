@@ -39,6 +39,14 @@ def store(tmp_path) -> SQLiteIdentityStore:
     return s
 
 
+def test_default_path_honors_identity_db_env(monkeypatch, tmp_path) -> None:
+    """The process-level identity path override must be respected."""
+    target = tmp_path / "identity.db"
+    monkeypatch.setenv("DATAFORGE_IDENTITY_DB_PATH", str(target))
+
+    assert SQLiteIdentityStore._default_path() == target
+
+
 @pytest.fixture
 def user(store: SQLiteIdentityStore) -> User:
     return store.create_user(

@@ -73,6 +73,7 @@ from app.services.job_mutation_service import (
     JobRecleanerService,
 )
 from app.storage_interface import get_job_repository
+from app.utils.aup import require_aup_accepted
 from app.utils.rbac import (
     UserRole,
     can_access_scoped_resource,
@@ -440,7 +441,11 @@ def register_jobs_write_routes(
     @router.post("/api/discover", response_model=dict)
     async def discover(
         req: DiscoveryRequest,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        _principal: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
     ):
         """Auto-discover best URLs to scrape for a topic."""
         try:
@@ -477,7 +482,11 @@ def register_jobs_write_routes(
     @router.post("/api/schema/suggest", response_model=dict)
     async def suggest_schema(
         req: SchemaSuggestionRequest,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        _principal: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
     ):
         """Infer topic + schema fields from plain-language user intent."""
         from app.insight_engine import (
@@ -490,7 +499,11 @@ def register_jobs_write_routes(
     async def create_job(
         job_data: JobCreate,
         request: Request,
-        _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+        _principal: Annotated[
+            tuple[UserRole, str, str, str],
+            Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+        ],
+        _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
         _plan_check: Annotated[dict[str, Any], Depends(require_plan_limit(UsageType.JOB_CREATED, quantity=1))],
     ):
         """Create a new scraping job.

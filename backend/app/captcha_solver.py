@@ -1,25 +1,19 @@
 """CAPTCHA solver adapter — protocol, adapters, and factory.
 
-DataForge integrates with third-party CAPTCHA solving services
-(2Captcha, Anti-Captcha) to automatically solve challenges that
-block extraction.  The solving pipeline is feature-flagged and
-off by default — when ``CAPTCHA_SOLVER_ENABLED`` is ``False``
-(the default), the :class:`_NoOpSolver` stub is returned and
-every ``solve()`` call returns ``None`` so the recovery path
-gracefully falls through to proxy rotation + backoff.
+DataForge does not solve CAPTCHA challenges. Historical third-party adapters
+remain private compatibility code, but the factory always returns the no-op
+implementation and protected-page recovery always fails closed.
 
 Design constraint
 -----------------
-This module implements a paid third-party solving integration
-ONLY.  There is NO CAPTCHA bypass, anti-bot bypass, paywall
-bypass, or automatic recognition.  The solver is always off
-by default and requires explicit opt-in via env var.  See
-P0 safety rules in AGENTS.md for the product boundary.
+This module must not submit challenges, obtain solver tokens, or inject
+challenge cookies. See the P0 safety rules in AGENTS.md for the product
+boundary.
 
-Protocol
---------
+Historical adapter protocol
+---------------------------
 
-Every solver must implement:
+The private legacy adapters implement:
 
 ============  ======================================================
 Method        Purpose
@@ -32,10 +26,9 @@ Method        Purpose
 Factory
 -------
 
-:func:`get_captcha_solver` returns a singleton based on
-``settings.CAPTCHA_PROVIDER`` (``"2captcha"`` or ``"anticaptcha"``).
-When ``CAPTCHA_SOLVER_ENABLED`` is ``False``, the factory returns
-:class:`_NoOpSolver` regardless of the provider name.
+:func:`get_captcha_solver` returns a singleton :class:`_NoOpSolver`, regardless
+of ``settings.CAPTCHA_PROVIDER``, API keys, or enablement flags. The product
+runtime never reaches the historical adapters.
 
 Adapters
 --------
@@ -349,12 +342,11 @@ class _AntiCaptchaSolver(CaptchaSolver):
 
 
 def get_captcha_solver() -> CaptchaSolver:
-    """Return the singleton CAPTCHA solver based on settings.
+    """Return the fail-closed CAPTCHA solver singleton.
 
-    When ``CAPTCHA_SOLVER_ENABLED`` is ``False`` (default), returns
-    a :class:`_NoOpSolver`.  When enabled, returns the appropriate
-    adapter based on ``CAPTCHA_PROVIDER`` (``"2captcha"`` or
-    ``"anticaptcha"``).
+    The provider integrations are intentionally unreachable. Configuration
+    cannot turn protected-page solving back on in development, staging, or
+    production.
     """
     global _solver_instance
     if _solver_instance is not None:
@@ -366,29 +358,9 @@ def get_captcha_solver() -> CaptchaSolver:
 
         from app.config import settings
 
-        if not settings.CAPTCHA_SOLVER_ENABLED:
-            _solver_instance = _NoOpSolver()
-            return _solver_instance
-
-        provider = (settings.CAPTCHA_PROVIDER or "2captcha").strip().lower()
-        api_key = settings.CAPTCHA_API_KEY or ""
-        timeout = settings.CAPTCHA_SOLVE_TIMEOUT_S
-
-        if not api_key:
-            logger.warning("CAPTCHA_SOLVER_ENABLED=True but CAPTCHA_API_KEY is empty; using NoOp")
-            _solver_instance = _NoOpSolver()
-            return _solver_instance
-
-        if provider == "2captcha":
-            _solver_instance = _TwoCaptchaSolver(api_key, timeout_s=timeout)
-            logger.info("Using _TwoCaptchaSolver")
-        elif provider == "anticaptcha":
-            _solver_instance = _AntiCaptchaSolver(api_key, timeout_s=timeout)
-            logger.info("Using _AntiCaptchaSolver")
-        else:
-            logger.warning("Unknown CAPTCHA_PROVIDER=%r; using NoOp", provider)
-            _solver_instance = _NoOpSolver()
-
+        if settings.CAPTCHA_SOLVER_ENABLED or settings.CAPTCHA_API_KEY:
+            logger.warning("CAPTCHA solver configuration is ignored; protected pages fail closed")
+        _solver_instance = _NoOpSolver()
         return _solver_instance
 
 

@@ -57,8 +57,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from app.billing.models import PlanTierId
+from app.saas.identity_store import get_identity_store
+from app.saas.models import UserStatus
 from app.url_safety import open_safe_client, validate_public_http_url
-from app.utils.rbac import UserRole, require_role
+from app.utils.rbac import UserRole, require_principal
 
 logger = logging.getLogger(__name__)
 
@@ -307,6 +309,15 @@ _DODO_SUSPENDED_EVENTS = frozenset({"subscription.on_hold", "subscription.failed
 _DODO_CANCELLED_EVENTS = frozenset({"subscription.cancelled"})
 _DODO_PAYMENT_COMPLETED_EVENTS = frozenset({"payment.succeeded"})
 _DODO_PAYMENT_FAILED_EVENTS = frozenset({"payment.failed"})
+_DODO_ENTITLEMENT_EVENTS = frozenset(
+    {
+        *_DODO_ACTIVE_EVENTS,
+        *_DODO_SUSPENDED_EVENTS,
+        *_DODO_CANCELLED_EVENTS,
+        *_DODO_PAYMENT_COMPLETED_EVENTS,
+        *_DODO_PAYMENT_FAILED_EVENTS,
+    },
+)
 
 
 def _extract_customer_id(data: dict[str, Any]) -> str:
@@ -322,6 +333,21 @@ def _extract_customer_id(data: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_dataforge_user_id(data: dict[str, Any]) -> str:
+    """Extract the server-issued DataForge identity from Dodo metadata."""
+    metadata_candidates: list[Any] = [data.get("metadata")]
+    customer = data.get("customer")
+    if isinstance(customer, dict):
+        metadata_candidates.append(customer.get("metadata"))
+    for metadata in metadata_candidates:
+        if not isinstance(metadata, Mapping):
+            continue
+        value = metadata.get("dataforge_user_id")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 def normalize_dodo_webhook(body: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     """Normalize a Dodo webhook into the shared billing vocabulary.
 
@@ -333,12 +359,17 @@ def normalize_dodo_webhook(body: dict[str, Any]) -> tuple[str, str, dict[str, An
     unknown product id — a silent tier downgrade must never happen.
     """
     event_type = str(body.get("type", "") or "")
+    original_event_type = event_type
     raw_data = body.get("data")
     if not isinstance(raw_data, dict):
         raw_data = {}
     data: dict[str, Any] = dict(raw_data)
 
-    customer_id = _extract_customer_id(data)
+    provider_customer_id = _extract_customer_id(data)
+    customer_id = _extract_dataforge_user_id(data)
+    if original_event_type in _DODO_ENTITLEMENT_EVENTS and not customer_id:
+        msg = "Dodo entitlement event is missing metadata.dataforge_user_id"
+        raise ValueError(msg)
     subscription_id = str(data.get("subscription_id", "") or "")
     status = str(data.get("status", "active") or "active")
     product_id = str(data.get("product_id", "") or "")
@@ -362,7 +393,8 @@ def normalize_dodo_webhook(body: dict[str, Any]) -> tuple[str, str, dict[str, An
     elif event_type in _DODO_PAYMENT_FAILED_EVENTS:
         data["status"] = "failed"
 
-    data.setdefault("customer_id", customer_id)
+    data["provider_customer_id"] = provider_customer_id
+    data["customer_id"] = customer_id or provider_customer_id
     data.setdefault("subscription_id", subscription_id)
     data.setdefault("status", status)
     return event_type, customer_id, data
@@ -491,6 +523,7 @@ class DodoClient:
         customer_email: str,
         customer_name: str,
         return_url: str,
+        metadata: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         """Create a hosted checkout session for a subscription product.
 
@@ -509,6 +542,8 @@ class DodoClient:
             "customer": {"email": customer_email, "name": customer_name},
             "return_url": return_url or self._return_url,
         }
+        if metadata:
+            payload["metadata"] = {str(key): str(value) for key, value in metadata.items()}
         with open_safe_client(timeout=30.0) as client:
             resp = client.post(
                 f"{self._base_url}/checkouts",
@@ -575,8 +610,10 @@ class DodoCheckoutRequest(BaseModel):
 
     plan_tier: Literal["starter", "pro", "enterprise"]
     return_url: str | None = Field(default=None, min_length=1, max_length=2048)
-    email: str = Field(default="", max_length=320)
-    name: str = Field(default="", max_length=255)
+    # Accepted for backwards-compatible clients but deliberately ignored.
+    # Checkout identity is always loaded from the authenticated account.
+    email: str = Field(default="", max_length=320, description="Deprecated; server derives this from the session")
+    name: str = Field(default="", max_length=255, description="Deprecated; server derives this from the session")
 
     @field_validator("return_url")
     @classmethod
@@ -593,13 +630,31 @@ class DodoCheckoutRequest(BaseModel):
 @router.post("/checkout", status_code=200)
 async def dodo_checkout(
     body: DodoCheckoutRequest,
-    _role: Annotated[str, Depends(require_role([UserRole.USER]))],
+    principal: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.USER])),
+    ],
 ) -> dict[str, str]:
     """Create a Dodo checkout session for a plan tier.
 
     Returns ``{"checkout_url": ..., "session_id": ..., "plan_tier": ...}``.
     The user is redirected to ``checkout_url`` (hosted by Dodo).
     """
+    _role, user_id, org_id, project_id = principal
+    store = get_identity_store()
+    user = store.get_user(user_id)
+    project = store.get_project(project_id) if project_id else None
+    if (
+        user is None
+        or user.status is UserStatus.DISABLED
+        or not org_id
+        or not project_id
+        or project is None
+        or project.org_id != org_id
+        or not store.is_org_member(user_id, org_id)
+    ):
+        raise HTTPException(status_code=403, detail="A valid tenant session is required for checkout.")
+
     client = get_dodo_client()
     if not client.is_configured:
         raise HTTPException(
@@ -609,9 +664,14 @@ async def dodo_checkout(
     try:
         session = client.create_checkout_session(
             plan_tier=body.plan_tier,
-            customer_email=body.email,
-            customer_name=body.name,
+            customer_email=user.email,
+            customer_name=user.display_name or user.email,
             return_url=body.return_url or "",
+            metadata={
+                "dataforge_user_id": user_id,
+                "dataforge_org_id": org_id,
+                "dataforge_project_id": project_id,
+            },
         )
     except (ValueError, RuntimeError) as exc:
         logger.warning("Dodo checkout session creation failed: %s", exc)

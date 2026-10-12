@@ -116,3 +116,13 @@ services:
     volumes:
       # Replace the default nginx config with an HTTP-only version for local testing
       - ./nginx.local.conf:/etc/nginx/nginx.conf:ro
+
+# Local-only storage bindings. The production compose file ships a portable
+# named volume (``dataforge_prometheus_data``). On this machine the Prometheus
+# 3 migration cloned the pre-upgrade 2.x database into a timestamped external
+# volume; keep using that clone here so a plain production deploy remains
+# unaffected. Override ``DATAFORGE_PROMETHEUS_VOLUME_NAME`` to point elsewhere.
+volumes:
+  prometheus_data:
+    name: ${DATAFORGE_PROMETHEUS_VOLUME_NAME:-dataforge_prometheus3_approved_1791129494907152392}
+    external: true

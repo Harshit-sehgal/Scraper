@@ -47,6 +47,20 @@ def test_field_level_f1_missing_field() -> None:
     assert result["price"]["recall"] == 0.5
 
 
+def test_field_level_f1_pairs_values_by_record_identity() -> None:
+    """Equal value sets in different rows must not score as a perfect match."""
+    extracted = [
+        {"title": "A", "price": "£12.00"},
+        {"title": "B", "price": "£10.00"},
+    ]
+    expected = [
+        {"title": "A", "price": "£10.00"},
+        {"title": "B", "price": "£12.00"},
+    ]
+    result = field_level_f1(extracted, expected, ["title", "price"])
+    assert result["price"]["f1"] == 0.0
+
+
 def test_field_level_f1_no_data() -> None:
     result = field_level_f1([], [], ["title"])
     assert result["title"]["f1"] == 0.0

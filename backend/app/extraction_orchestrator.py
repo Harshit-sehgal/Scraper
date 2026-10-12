@@ -111,9 +111,30 @@ def _merge_composite_records(
     if len(records_list) == 1:
         return records_list[0]
 
-    # Use the first schema field as the deduplication key
-    # (the user controls field ordering, so the first field is the best candidate)
+    # Pick a field that can actually identify a record.  The first schema
+    # field is not necessarily an identity field: boolean availability/status
+    # values and other flags are commonly repeated across every record.  If
+    # such a field is used as the merge key, a multi-record page collapses to
+    # one row during the fallback-pass merge.
     id_field = schema_fields[0].name if schema_fields else "name"
+    all_records = [record for pass_records in records_list for record in pass_records]
+    identity_tokens = ("id", "name", "title", "url", "sku", "code", "key", "slug")
+    candidates: list[tuple[int, int, int, str]] = []
+    for index, field in enumerate(schema_fields):
+        if field.field_type in (FieldType.BOOLEAN, FieldType.LIST_STRING):
+            continue
+        values = {
+            str(record.get(field.name, "")).strip().casefold()
+            for record in all_records
+            if record.get(field.name) not in (None, "")
+        }
+        if len(values) <= 1:
+            continue
+        field_name = field.name.casefold().replace("-", "_")
+        semantic_score = int(any(token in field_name.split("_") for token in identity_tokens))
+        candidates.append((semantic_score, len(values), -index, field.name))
+    if candidates:
+        id_field = max(candidates)[3]
 
     from app.data_utils import normalize_scraped_record
 

@@ -42,7 +42,7 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.browser]
 # Skip the entire module if Playwright is not installed.
 pytest.importorskip("playwright")
 
-_FIXTURE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "pages" / "hostile_lazy_loader.html"
+_FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "pages" / "hostile_lazy_loader.html"
 # Sentinel injected by the /loadmore route — defaults to "scroll" in the template.
 # Using a sentinel lets the handler fail loudly if the fixture template ever drops it.
 _MODE_SENTINEL = 'value="scroll"'

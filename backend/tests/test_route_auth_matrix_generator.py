@@ -47,12 +47,12 @@ def test_route_auth_matrix_classifies_core_route_tiers(monkeypatch, tmp_path) ->
     matrix = _load_module().build_matrix()
 
     assert _row_by_method_path(matrix, "GET", "/api/jobs").access == "authenticated-user"
-    assert _row_by_method_path(matrix, "POST", "/api/jobs").access == "operator-or-admin"
+    assert _row_by_method_path(matrix, "POST", "/api/jobs").access == "authenticated-user"
     # DELETE on /api/jobs/{job_id} is operator-allowed (operators
     # remove job schedules they manage; only true admin deletions like
     # /api/templates stay admin-only).
     assert _row_by_method_path(matrix, "DELETE", "/api/jobs/{job_id}").access == "operator-or-admin"
-    assert _row_by_method_path(matrix, "POST", "/api/url/analyze").access == "operator-or-admin"
+    assert _row_by_method_path(matrix, "POST", "/api/url/analyze").access == "authenticated-user"
     assert _row_by_method_path(matrix, "GET", "/metrics").access == "metrics-token-if-configured"
 
 
@@ -99,7 +99,7 @@ def test_route_auth_matrix_uses_fresh_app_factory(monkeypatch, tmp_path) -> None
     assert _row_by_method_path(matrix, "GET", "/api/jobs").access == "authenticated-user"
 
 
-def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) -> None:
+def test_route_auth_matrix_has_no_unreviewed_user_level_mutations(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("DATAFORGE_DOTENV_PATH", "/dev/null")
     monkeypatch.setenv("DATAFORGE_STORAGE_BACKEND", "sqlite")
     monkeypatch.setenv("DATAFORGE_STATE_FILE", str(tmp_path / "jobs_state.json"))
@@ -107,11 +107,10 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
 
     matrix = _load_module().build_matrix()
 
-    # Endpoints that are intentionally unauthenticated mutation routes. Each
-    # entry is a (method, path) pair that has a documented reason for being
-    # open (e.g. browser-generated reports). The reason is enforced by the
-    # body-size middleware (5 MB cap) and the global /api/* rate limiter.
-    UNAUTHENTICATED_MUTATIONS = {
+    # Endpoints that are intentionally open or user-level mutation routes.
+    # User-level entries are still authenticated and tenant-scoped; this list
+    # prevents the matrix from silently gaining a new user mutation.
+    REVIEWED_MUTATIONS = {
         ("POST", "/api/system/csp-violations"),  # browser CSP report, no key
         ("POST", "/api/session"),  # self-service auth — any authenticated user can create a session
         ("DELETE", "/api/session"),  # self-service auth — any authenticated user can clear their session
@@ -130,6 +129,13 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
         ("POST", "/api/saas/invitations/{invitation_id}/respond"),  # any authenticated user can respond to invitations
         ("POST", "/api/saas/password-reset/request"),  # unauthenticated — prevents email enumeration
         ("POST", "/api/saas/password-reset/reset"),  # unauthenticated — uses token, not session
+        ("POST", "/api/discover"),  # AUP-gated customer discovery wedge
+        ("POST", "/api/schema/suggest"),  # AUP-gated customer schema wedge
+        ("POST", "/api/url/analyze"),  # AUP-gated customer page analysis wedge
+        ("POST", "/api/jobs"),  # AUP-gated tenant job creation
+        ("POST", "/api/scheduled"),  # AUP-gated tenant schedule creation
+        ("PUT", "/api/scheduled/{job_id}"),  # tenant-scoped schedule update
+        ("DELETE", "/api/scheduled/{job_id}"),  # tenant-scoped schedule deletion
     }
 
     unsafe = [
@@ -139,7 +145,7 @@ def test_route_auth_matrix_has_no_user_level_mutations(monkeypatch, tmp_path) ->
             row.path.startswith("/api/")
             and row.method != "GET"
             and row.access == "authenticated-user"
-            and (row.method, row.path) not in UNAUTHENTICATED_MUTATIONS
+            and (row.method, row.path) not in REVIEWED_MUTATIONS
         )
     ]
 

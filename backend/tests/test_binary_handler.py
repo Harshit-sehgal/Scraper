@@ -21,6 +21,7 @@ never touch the real production binaries directory.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -281,7 +282,7 @@ class TestRoundTrip:
     """Full-cycle: download a binary, look it up, iterate it from disk."""
 
     @pytest.fixture(autouse=True)
-    def _redirect(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def _redirect(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Generator[None, None, None]:
         monkeypatch.setenv("DATAFORGE_STATE_DIR", str(tmp_path))
         with patch("app.binary_handler._binary_store", {}):
             yield
@@ -355,7 +356,7 @@ class TestBinaryStoreEviction:
             _BINARY_STORE_MAX_ENTRIES,
         )
 
-        local = OrderedDict()
+        local: OrderedDict[str, dict[str, str]] = OrderedDict()
         # Repopulate with cap + 1 entries while preserving eviction
         # semantics — logic in download_binary uses the same pattern.
         for i in range(_BINARY_STORE_MAX_ENTRIES + 1):

@@ -4,6 +4,8 @@ from argparse import ArgumentTypeError
 from datetime import UTC, datetime
 from pathlib import Path
 import sys
+import urllib.error
+from unittest.mock import patch
 
 import pytest
 
@@ -21,6 +23,7 @@ from scripts.run_alert_delivery_drill import (
     build_result,
     display_url,
     endpoint,
+    http_request,
     normalize_base_url,
     parse_alerts,
     parse_label,
@@ -58,6 +61,17 @@ def test_url_helpers_normalize_and_redact_credentials():
 
     with pytest.raises(ArgumentTypeError):
         normalize_base_url("localhost:9093")
+
+
+def test_http_request_returns_structured_failure_on_connection_error():
+    with patch(
+        "scripts.run_alert_delivery_drill.urllib.request.urlopen",
+        side_effect=urllib.error.URLError("connection refused"),
+    ):
+        result = http_request("GET", "http://127.0.0.1:1/-/ready", timeout_seconds=0.1)
+
+    assert result.status_code == 0
+    assert result.body.startswith("URLError:")
 
 
 def test_parse_label_requires_key_value_format():

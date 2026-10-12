@@ -127,3 +127,4 @@ artifacts/frontend_review/
 
 # Stale database dump backups
 *.original
+artifacts/backup_drill/backups/*.sql.gz

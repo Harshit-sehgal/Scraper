@@ -730,6 +730,52 @@ class TestBatchExportEdgeCases:
         with pytest.raises(ValueError, match="No results"):
             export_service.build_json_bytes(job)
 
+    def test_build_json_bytes_uses_declared_schema_fields(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        job = MagicMock()
+        job.results = [
+            {
+                "title": "Example Book",
+                "price": "$19.99",
+                "source_url": "https://example.test/book",
+                "record_score": 0.99,
+            },
+        ]
+        job.schema_fields = [SimpleNamespace(name="title"), SimpleNamespace(name="price")]
+
+        data = json.loads(export_service.build_json_bytes(job))
+
+        assert data == [{"title": "Example Book", "price": "$19.99"}]
+
+    @pytest.mark.asyncio
+    async def test_json_stream_from_disk_uses_declared_schema_fields(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        job = MagicMock()
+        job.id = "job-json"
+        job.results_file_path = "/tmp/results.jsonl"
+        job.schema_fields = [SimpleNamespace(name="title"), SimpleNamespace(name="price")]
+
+        def page_loader(*_args, **_kwargs):
+            return (
+                [
+                    {
+                        "title": "Example Book",
+                        "price": "$19.99",
+                        "source_url": "https://example.test/book",
+                        "record_score": 0.99,
+                    },
+                ],
+                1,
+            )
+
+        payload = await _async_collect(export_service.stream_json_from_disk(job, page_loader))
+
+        assert json.loads(payload) == [{"title": "Example Book", "price": "$19.99"}]
+
     def test_build_excel_bytes_empty_results_raises(self) -> None:
         from unittest.mock import MagicMock
 

@@ -399,13 +399,29 @@ def process_raw_records(
         norm["record_score"] = score_record_quality(norm, schema_fields)
         results.append(norm)
 
-    results = [r for r in results if r.get("record_score", 0.0) >= (min_record_score * settings.RECORD_ACCEPTANCE_FACTOR)]
+    acceptance_threshold = min_record_score * settings.RECORD_ACCEPTANCE_FACTOR
+    results = [
+        r
+        for r in results
+        if r.get("record_score", 0.0) >= acceptance_threshold
+        or all(
+            not _is_empty_value(r.get(field.name)) and _value_matches_schema_type(r.get(field.name), field.field_type)
+            for field in schema_fields
+        )
+    ]
     results = _dedupe_records(results, schema_fields)
     results = _limit_source_records(results, schema_fields)
     avg_score = sum(r.get("record_score", 0) for r in results) / max(len(results), 1)
 
-    # Run semantic pipeline if quality is low
-    if avg_score < 0.5 and results:
+    # Run semantic pipeline if quality is low.  A schema-complete row has
+    # already satisfied the user's requested projection and type-aware
+    # normalization; sending it through the semantic noise filter can discard
+    # legitimate short entities (for example a one-word product title) even
+    # though all requested fields are present.
+    schema_complete = bool(results) and all(
+        all(not _is_empty_value(record.get(field.name)) for field in schema_fields) for record in results
+    )
+    if avg_score < 0.5 and results and not schema_complete:
         try:
             semantic_results = run_pipeline(results, [f.name for f in schema_fields])
             if semantic_results:

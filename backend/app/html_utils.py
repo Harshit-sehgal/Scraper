@@ -685,14 +685,15 @@ async def _detect_anti_bot_and_fallback(
         is_antibot = any(marker in err_msg for marker in anti_bot_keywords)
 
     if is_antibot:
-        logger.exception(
+        logger.error(
             "[Scraper] Anti-bot challenge detected for %s. Refusing naive HTTP fallback to prevent IP ban.",
             url,
+            exc_info=e,
         )
         _ab_msg = f"Anti-bot challenge detected: {e}"
         raise ValueError(_ab_msg) from e
 
-    logger.exception("[Scraper] Playwright failed for %s. Final fallback to httpx_basic", url)
+    logger.error("[Scraper] Playwright failed for %s. Final fallback to httpx_basic", url, exc_info=e)
     return await _fetch_with_httpx(
         url,
         strategy=FetchStrategy.HTTPX_BASIC,
@@ -1027,6 +1028,41 @@ def _sanitize_field_value(field: SchemaField, value, base_url: str = ""):
 
     text = _compact_text(str(value))
     if _is_empty_value(text):
+        return None
+
+    if field.field_type == FieldType.BOOLEAN:
+        if isinstance(value, bool):
+            return value
+
+        normalized = re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+        if normalized in {
+            "true",
+            "yes",
+            "y",
+            "1",
+            "on",
+            "active",
+            "available",
+            "in stock",
+            "enabled",
+            "present",
+        }:
+            return True
+        if normalized in {
+            "false",
+            "no",
+            "n",
+            "0",
+            "off",
+            "inactive",
+            "unavailable",
+            "out of stock",
+            "sold out",
+            "disabled",
+            "missing",
+            "not available",
+        }:
+            return False
         return None
 
     if field.field_type == FieldType.EMAIL:

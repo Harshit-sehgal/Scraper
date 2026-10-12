@@ -575,8 +575,7 @@ class TestPostgresIntegration:
 
     @pytest.fixture(autouse=True)
     def postgres_container(self):
-        """Start a Postgres testcontainer or reuse a running one."""
-        import socket
+        """Start an isolated Postgres testcontainer or use an explicit test DSN."""
 
         from app.postgres_repository import _close_pool
         from app.storage_interface import reset_repository
@@ -584,19 +583,11 @@ class TestPostgresIntegration:
         _close_pool()
         reset_repository()
 
-        use_running = False
-        dsn = os.environ.get("DATAFORGE_DATABASE_URL")
-        if dsn:
-            use_running = True
-        else:
-            try:
-                with socket.create_connection(("127.0.0.1", 5432), timeout=1):
-                    use_running = True
-                    os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-                    os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
-                    os.environ["PGPASSWORD"] = "testpassword"
-            except (TimeoutError, ConnectionRefusedError):
-                pass
+        explicit_dsn = os.environ.get("DATAFORGE_TEST_POSTGRES_URL")
+        use_running = bool(explicit_dsn)
+        if explicit_dsn:
+            os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+            os.environ["DATAFORGE_DATABASE_URL"] = explicit_dsn
 
         if use_running:
             try:
@@ -604,10 +595,9 @@ class TestPostgresIntegration:
             finally:
                 _close_pool()
                 reset_repository()
-                if not dsn:
-                    os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-                    os.environ.pop("DATAFORGE_DATABASE_URL", None)
-                    os.environ.pop("PGPASSWORD", None)
+                os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+                os.environ.pop("DATAFORGE_DATABASE_URL", None)
+                os.environ.pop("PGPASSWORD", None)
         else:
             from testcontainers.postgres import PostgresContainer
 

@@ -24,6 +24,7 @@ let _currentPage = 1;
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 let _pageSize = DEFAULT_PAGE_SIZE;
+let _resultSchemaFields = null;
 
 export function getCurrentPage() {
   return _currentPage;
@@ -115,16 +116,18 @@ function renderResultsSkeleton() {
 
 export async function viewResults(id) {
   currentJobId = id;
+  _resultSchemaFields = null;
   switchView("results");
   renderResultsSkeleton();
   try {
-    const r = await apiFetch(endpoints.job(id));
+    const r = await apiFetch(endpoints.job(id, true));
     if (!r.ok) throw new Error(`Failed to load results: ${r.status}`);
     const j = await r.json();
     // Guard against stale responses: if the user has since clicked
     // another job's "View Results", ``currentJobId`` will have been
     // updated and this response is no longer relevant.
     if (currentJobId !== id) return;
+    _resultSchemaFields = schemaFieldNames(j.schema_fields);
     const resTitle = document.getElementById("res-title");
     if (resTitle) resTitle.textContent = j.name;
     const resMeta = document.getElementById("res-meta");
@@ -332,7 +335,7 @@ export function renderFilteredResults() {
   const { rows: pagedRows, totalPages, totalRows, currentPage } = paginateRows(filtered, _currentPage, _pageSize);
   _currentPage = currentPage;
 
-  renderTable(pagedRows, emptyMessage);
+  renderTable(pagedRows, emptyMessage, _resultSchemaFields);
 
   const label = document.getElementById("result-count-label");
   if (label) {
@@ -440,7 +443,15 @@ function buildPageBtn(page, currentPage) {
   return `<button type="button" class="btn ghost small pagination-page ${active}" data-action="go-to-page" data-page="${page}" aria-label="Page ${page}" aria-current="${page === currentPage ? "page" : "false"}">${page}</button>`;
 }
 
-export function renderTable(results, emptyMessage = "No results") {
+function schemaFieldNames(schemaFields) {
+  if (!Array.isArray(schemaFields)) return null;
+  const names = schemaFields
+    .map((field) => (typeof field === "string" ? field : field?.name))
+    .filter((name) => typeof name === "string" && name.trim());
+  return names.length ? names : null;
+}
+
+export function renderTable(results, emptyMessage = "No results", requestedFields = null) {
   const thead = document.getElementById("res-thead");
   const tbody = document.getElementById("res-tbody");
   if (!thead || !tbody) return;
@@ -480,21 +491,26 @@ export function renderTable(results, emptyMessage = "No results") {
     "source_url",
     "scraped_at",
   ];
-  const seen = new Set();
-  const discoveredKeys = [];
-  results.forEach((row) => {
-    Object.keys(row || {}).forEach((k) => {
-      if (k.startsWith("_")) return;
-      if (!seen.has(k)) {
-        seen.add(k);
-        discoveredKeys.push(k);
-      }
-    });
-  });
-  const keys = [
-    ...preferredOrder.filter((k) => seen.has(k)),
-    ...discoveredKeys.filter((k) => !preferredOrder.includes(k)),
-  ];
+  const keys =
+    Array.isArray(requestedFields) && requestedFields.length
+      ? requestedFields
+      : (() => {
+          const seen = new Set();
+          const discoveredKeys = [];
+          results.forEach((row) => {
+            Object.keys(row || {}).forEach((k) => {
+              if (k.startsWith("_")) return;
+              if (!seen.has(k)) {
+                seen.add(k);
+                discoveredKeys.push(k);
+              }
+            });
+          });
+          return [
+            ...preferredOrder.filter((k) => seen.has(k)),
+            ...discoveredKeys.filter((k) => !preferredOrder.includes(k)),
+          ];
+        })();
   thead.innerHTML = `<tr>${keys.map((k) => `<th>${esc(k)}</th>`).join("")}</tr>`;
   tbody.innerHTML = results
     .map((row) => {

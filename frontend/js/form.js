@@ -96,6 +96,22 @@ export function validateJobForm() {
   return { ok: errors.length === 0, errors };
 }
 
+export function normalizeSelectorMapForApi(selectorMap) {
+  if (!selectorMap || typeof selectorMap !== "object") return {};
+  const fields = {};
+  Object.entries(selectorMap.fields || {}).forEach(([name, value]) => {
+    const selector = typeof value === "string" ? value : value?.selector;
+    if (typeof selector === "string" && selector.trim()) {
+      fields[name] = selector.trim();
+    }
+  });
+  if (!Object.keys(fields).length) return {};
+  return {
+    item_container: typeof selectorMap.item_container === "string" ? selectorMap.item_container.trim() : "",
+    fields,
+  };
+}
+
 // ─── Init Form ───
 
 export async function initForm() {
@@ -205,6 +221,7 @@ export function addField(preset = null) {
                 <option value="string" ${selectedType === "string" ? "selected" : ""}>Text</option>
                 <option value="integer" ${selectedType === "integer" ? "selected" : ""}>Integer</option>
                 <option value="float" ${selectedType === "float" ? "selected" : ""}>Decimal</option>
+                <option value="number" ${selectedType === "number" ? "selected" : ""}>Number</option>
                 <option value="boolean" ${selectedType === "boolean" ? "selected" : ""}>Boolean</option>
                 <option value="email" ${selectedType === "email" ? "selected" : ""}>Email</option>
                 <option value="url" ${selectedType === "url" ? "selected" : ""}>URL</option>
@@ -214,6 +231,8 @@ export function addField(preset = null) {
                 <option value="list_string" ${selectedType === "list_string" ? "selected" : ""}>List</option>
                 <option value="currency" ${selectedType === "currency" ? "selected" : ""}>Currency</option>
                 <option value="percentage" ${selectedType === "percentage" ? "selected" : ""}>Percentage</option>
+                <option value="code" ${selectedType === "code" ? "selected" : ""}>Code</option>
+                <option value="rating" ${selectedType === "rating" ? "selected" : ""}>Rating</option>
             </select>
         </div>
         <div class="form-group">
@@ -564,10 +583,10 @@ export async function submitJob(e) {
     });
     const fields = { ...filteredFields, ...manualSelectorFields };
     if (Object.keys(fields).length > 0) {
-      selectorsMap = { item_container: sm.item_container || "", fields };
+      selectorsMap = normalizeSelectorMapForApi({ item_container: sm.item_container || "", fields });
     }
   } else if (Object.keys(manualSelectorFields).length > 0) {
-    selectorsMap = { item_container: "", fields: manualSelectorFields };
+    selectorsMap = normalizeSelectorMapForApi({ item_container: "", fields: manualSelectorFields });
   }
 
   const authProfileId = document.getElementById("inp-auth-profile")?.value?.trim() || "";

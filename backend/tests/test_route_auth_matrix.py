@@ -69,7 +69,7 @@ ROUTE_MATRIX = [
     ("GET", "/api/scraper/selectors/stats", "operator"),
     ("POST", "/api/discover", "operator"),
     ("POST", "/api/schema/suggest", "operator"),
-    ("POST", "/api/url/analyze", "operator"),
+    ("POST", "/api/url/analyze", "user"),
     ("POST", "/api/scraper/strategy/record", "operator"),
     ("POST", "/api/scraper/strategy/evolve/example.com", "operator"),
     ("POST", "/api/scraper/ml/learn", "operator"),
@@ -284,6 +284,17 @@ async def test_bearer_token_auth(client) -> None:
         headers={"Authorization": "Bearer test_user_key"},
     )
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+
+
+@pytest.mark.asyncio
+async def test_url_analyzer_accepts_user_key(client) -> None:
+    """Customer-facing URL analysis must be available to a user principal."""
+    response = await client.post(
+        "/api/url/analyze",
+        json={"url": "https://example.com/about", "fetch_preview": False},
+        headers=USER_AUTH,
+    )
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text[:200]}"
 
 
 @pytest.mark.asyncio

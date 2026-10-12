@@ -63,6 +63,25 @@ class TestSelectorCss:
         assert _selector_css({"selector": ""}) is None
 
 
+def test_extract_raw_from_selectors_preserves_all_repeated_list_values() -> None:
+    html = """
+    <div class="record"><span class="name">Alpha</span><a class="tag">one</a><a class="tag">two</a></div>
+    <div class="record"><span class="name">Beta</span><a class="tag">three</a><a class="tag">four</a></div>
+    """
+    selectors = {
+        "item_container": "div.record",
+        "fields": {
+            "name": {"selector": "span.name", "type": "string"},
+            "tag": {"selector": "a.tag", "type": "list_string"},
+        },
+    }
+
+    assert extract_raw_from_selectors(html, selectors) == [
+        {"name": "Alpha", "tag": ["one", "two"]},
+        {"name": "Beta", "tag": ["three", "four"]},
+    ]
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Build Selector Field Metadata
 # ═══════════════════════════════════════════════════════════════════════════════

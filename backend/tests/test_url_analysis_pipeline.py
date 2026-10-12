@@ -163,6 +163,50 @@ def test_stage_analyze_page_calls_detection(pipeline: URLAnalysisPipeline) -> No
             assert ctx.patterns == {"fields": [], "confidence": 0.0}
 
 
+@pytest.mark.anyio
+async def test_stage_extract_fields_drops_unscoped_pattern_noise_for_repeated_containers(
+    pipeline: URLAnalysisPipeline,
+) -> None:
+    """A repeated page container must not emit page-wide regex fields without selectors."""
+    ctx = _UrlAnalysisContext(url="https://example.com/records")
+    ctx.html = '<div class="record">far</div><div class="record">near</div>'
+    ctx.profile = MagicMock(
+        structure_type="cards",
+        structure_confidence=0.8,
+        headers=[],
+        container_selector="div.record",
+    )
+    ctx.patterns = MagicMock()
+
+    sd_funcs = {
+        "_extract_container_text_values": MagicMock(return_value=["far", "near"]),
+        "_rename_generic_fields": MagicMock(
+            side_effect=lambda fields: fields,
+        ),
+        "build_url_analysis_prompt": MagicMock(return_value="prompt"),
+        "_build_llm_fields": MagicMock(
+            return_value=[
+                {
+                    "name": "three_letter_code",
+                    "type": "code",
+                    "selector": "",
+                    "example_value": "far",
+                    "confidence": 0.5,
+                },
+            ],
+        ),
+        "llm_json": AsyncMock(return_value=None),
+    }
+
+    with (
+        patch("app.services.url_analysis_pipeline._import_sd", side_effect=lambda name: sd_funcs[name]),
+        patch("app.url_value_classification.infer_dom_field_suggestions", return_value=[]),
+    ):
+        await pipeline._stage_extract_fields(ctx)
+
+    assert ctx.suggested_fields == []
+
+
 # ── run() orchestration ────────────────────────────────────────────────────
 
 

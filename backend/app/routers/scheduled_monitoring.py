@@ -266,7 +266,7 @@ async def create_scheduled_job(
     name: str,
     auth: Annotated[
         tuple[UserRole, str, str, str],
-        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
     _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
     frequency: ScheduledJobFrequency = ScheduledJobFrequency.DAILY,
@@ -318,7 +318,7 @@ async def create_scheduled_job(
 async def list_scheduled_jobs(
     auth: Annotated[
         tuple[UserRole, str, str, str],
-        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
     enabled_only: bool = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -337,7 +337,7 @@ async def get_scheduled_job(
     job_id: str,
     auth: Annotated[
         tuple[UserRole, str, str, str],
-        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ):
     """Get a single scheduled job by ID."""
@@ -349,7 +349,7 @@ async def update_scheduled_job(
     job_id: str,
     auth: Annotated[
         tuple[UserRole, str, str, str],
-        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
     name: str | None = None,
     frequency: ScheduledJobFrequency | None = None,
@@ -402,7 +402,7 @@ async def delete_scheduled_job(
     job_id: str,
     auth: Annotated[
         tuple[UserRole, str, str, str],
-        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ):
     """Delete a scheduled job permanently."""
@@ -419,7 +419,7 @@ async def detect_changes(
     job_id: str,
     auth: Annotated[
         tuple[UserRole, str, str, str],
-        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR])),
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
     ],
 ):
     """Report the most recent change signals observed for a scheduled job.

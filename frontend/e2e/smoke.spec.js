@@ -24,11 +24,12 @@ test.describe("Dashboard UI smoke tests", () => {
     await expect(page.locator("#view-new")).toBeVisible();
   });
 
-  test("desktop shell uses sidebar-only chrome", async ({ page }) => {
+  test("desktop shell keeps status chrome available", async ({ page }) => {
     await page.goto("/app/");
     await dismissApiKeyOverlay(page);
     await expect(page.locator(".sidebar")).toBeVisible();
-    await expect(page.locator(".topbar")).toBeHidden();
+    await expect(page.locator(".topbar")).toBeVisible();
+    await expect(page.locator("#health-pill")).toBeVisible();
   });
 
   test("dashboard nav navigates to dashboard view", async ({ page }) => {

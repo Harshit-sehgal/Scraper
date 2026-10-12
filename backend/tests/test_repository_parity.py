@@ -77,33 +77,23 @@ def sqlite_repo(tmp_path, monkeypatch):
 
 @pytest.fixture
 def postgres_repo(monkeypatch, tmp_path):
-    """Build a PostgresJobRepository (psycopg2) backed by testcontainers or a running instance.
+    """Build a PostgresJobRepository (psycopg2) backed by an isolated container.
 
-    Requires the ``--run-postgres`` flag and a working Docker daemon.
+    Requires the ``--run-postgres`` flag and a working Docker daemon. An
+    externally managed disposable database is accepted only through the
+    explicit ``DATAFORGE_TEST_POSTGRES_URL`` override.
     """
     pytest.importorskip("testcontainers")
     pytest.importorskip("psycopg2")
 
-    import socket
+    explicit_dsn = os.environ.get("DATAFORGE_TEST_POSTGRES_URL")
 
-    use_running = False
-    dsn = os.environ.get("DATAFORGE_DATABASE_URL")
-    if dsn:
-        use_running = True
-    else:
-        try:
-            with socket.create_connection(("127.0.0.1", 5432), timeout=1):
-                use_running = True
-                url = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
-                monkeypatch.setenv("DATAFORGE_DATABASE_URL", url)
-        except (TimeoutError, ConnectionRefusedError):
-            pass
-
-    if use_running:
+    if explicit_dsn:
         # Clean schema first to ensure clean state
         from app.postgres_repository import PostgresJobRepository, _close_pool, _conn, _execute
         from app.storage_interface import reset_repository
 
+        monkeypatch.setenv("DATAFORGE_DATABASE_URL", explicit_dsn)
         _close_pool()
         reset_repository()
 

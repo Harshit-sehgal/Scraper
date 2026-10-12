@@ -15,11 +15,23 @@ evidence under `artifacts/validation/`.
 From the repository root:
 
 ```bash
+# Preferred when uv is available (honours the on-disk uv.lock):
+uv sync --extra dev
+# Or without uv:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+
 npm ci
+# Browser-dependent tests need the Chromium build Playwright pins:
+python -m playwright install chromium
 ```
+
+`scripts/validate_local.py` runs every check with the project `.venv`
+interpreter when one exists, so the gate uses the dependencies declared in
+`pyproject.toml` instead of a drifted system Python. Set
+`DATAFORGE_VALIDATE_PYTHON` to point at a different interpreter, or omit
+`.venv` (as CI does) to use the running interpreter.
 
 The current workspace has `python3`, not `python`. In CI, GitHub
 Actions provides `python`, but local commands in this checkout should
@@ -37,8 +49,14 @@ DATAFORGE_ADMIN_API_KEY=admin-key
 DATAFORGE_SESSION_SECRET=test-session-secret-change-me
 DATAFORGE_ALLOW_INSECURE_DEV_AUTH=false
 DATAFORGE_SKIP_DB_CHECK=true
+DATAFORGE_IDENTITY_DB_PATH=backend/data/identity_test.db
+DATAFORGE_SESSION_DB_PATH=backend/data/session_test.db
 PYTHONPATH=backend
 ```
+
+The identity and session database paths are test-process overrides. Under
+pytest-xdist, each worker receives its own suffixed path so parallel tests
+cannot clear or overwrite another worker's SaaS identity state.
 
 ## Commands
 
@@ -127,7 +145,13 @@ The default runner does not claim coverage for opt-in environments:
 
 - Postgres integration tests requiring `--run-postgres`.
 - Browser E2E tests requiring Playwright/browser setup.
-- Live benchmark or network-dependent tests.
+- Live benchmark or network-dependent tests. The live benchmark requires
+  both `--run-live-benchmark` and
+  `DATAFORGE_RUN_LIVE_BENCHMARKS=true`; the marker is skipped by default.
+- Postgres fixtures use an isolated disposable Testcontainers database by
+  default. `DATAFORGE_TEST_POSTGRES_URL` is an explicit opt-in for an
+  operator-provided disposable DSN; never point it at an ordinary developer
+  database.
 - Real production deployment checks, TLS, backups, restore drills,
   monitoring, alert delivery, and load tests.
 

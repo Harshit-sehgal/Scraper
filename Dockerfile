@@ -12,7 +12,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 0: Base — shared system dependencies
 # ─────────────────────────────────────────────────────────────────────────────
-FROM python:3.12-slim@sha256:d764629ce0ddd8c71fd371e9901efb324a95789d2315a47db7e4d27e78f1b0e9 AS base
+FROM python:3.12.15-slim-trixie@sha256:29113dcae7aad06daa8e95260fa09f27d62be33b9687ea3774f771d601a02256 AS base
 
 WORKDIR /app
 

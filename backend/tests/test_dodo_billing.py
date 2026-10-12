@@ -30,7 +30,7 @@ def _sign(
     webhook_id: str = "wh_test_001",
     timestamp: int | None = None,
     secret: str = WEBHOOK_SECRET,
-) -> tuple[dict[str, str], str]:
+) -> tuple[dict[str, str], int]:
     """Build valid Standard-Webhooks headers for a raw body."""
     ts = int(time.time()) if timestamp is None else timestamp
     msg = f"{webhook_id}.{ts}.{raw_body.decode('utf-8')}".encode()
@@ -59,6 +59,7 @@ def _dodo_event(
         "data": {
             "subscription_id": subscription_id,
             "customer_id": customer_id,
+            "metadata": {"dataforge_user_id": customer_id},
             "product_id": product_id,
             "status": status,
             "payment_frequency_interval": "monthly",
@@ -189,6 +190,7 @@ class TestNormalization:
         assert data["plan_tier"] == "starter"
         assert data["status"] == "active"
         assert data["subscription_id"] == "sub_dodo_123"
+        assert data["provider_customer_id"] == "user_dodo_001"
 
     def test_subscription_on_hold_normalizes(self) -> None:
         from app.billing.dodo import normalize_dodo_webhook
@@ -213,6 +215,14 @@ class TestNormalization:
 
         with pytest.raises(ValueError):
             normalize_dodo_webhook(_dodo_event("subscription.active", product_id="pdt_unknown_xyz"))
+
+    def test_missing_dataforge_identity_is_rejected(self) -> None:
+        from app.billing.dodo import normalize_dodo_webhook
+
+        body = _dodo_event("subscription.active")
+        body["data"].pop("metadata")
+        with pytest.raises(ValueError, match="dataforge_user_id"):
+            normalize_dodo_webhook(body)
 
 
 # ---------------------------------------------------------------------------
@@ -389,6 +399,53 @@ class TestIdempotencyAndFailClosed:
             handle_dodo_webhook(raw, headers)
         assert exc_info.value.status_code == 401
 
+    def test_dodo_webhook_is_not_blocked_by_api_auth(self, client, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Provider webhooks reach signature verification without an API key."""
+        monkeypatch.setenv("DODO_PAYMENTS_WEBHOOK_KEY", WEBHOOK_SECRET)
+        resp = client.post("/api/billing/dodo/webhook", json={})
+        assert resp.status_code == 401, resp.text
+
+    def test_checkout_uses_persistent_identity_not_request_identity(self, client, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Checkout metadata and customer details cannot be spoofed by the browser."""
+        signup = client.post(
+            "/api/saas/signup",
+            json={
+                "email": "trusted-checkout@example.com",
+                "password": "SecurePass123!",
+                "display_name": "Trusted Customer",
+            },
+        )
+        assert signup.status_code == 201, signup.text
+
+        captured: dict[str, Any] = {}
+
+        class _ConfiguredClient:
+            is_configured = True
+
+            def create_checkout_session(self, **kwargs: Any) -> dict[str, Any]:
+                captured.update(kwargs)
+                return {"checkout_url": "https://checkout.dodopayments.com/session", "session_id": "cs_route"}
+
+        import app.billing.dodo as dodo_mod
+
+        monkeypatch.setattr(dodo_mod, "get_dodo_client", _ConfiguredClient)
+        resp = client.post(
+            "/api/billing/dodo/checkout",
+            json={
+                "plan_tier": "starter",
+                "return_url": "https://example.com/return",
+                "email": "attacker@example.com",
+                "name": "Attacker",
+            },
+            cookies=signup.cookies,
+        )
+        assert resp.status_code == 200, resp.text
+        assert captured["customer_email"] == "trusted-checkout@example.com"
+        assert captured["customer_name"] == "Trusted Customer"
+        assert captured["metadata"]["dataforge_user_id"] == signup.json()["user_id"]
+        assert captured["metadata"]["dataforge_org_id"] == signup.json()["organization_id"]
+        assert captured["metadata"]["dataforge_project_id"] == signup.json()["project_id"]
+
 
 # ---------------------------------------------------------------------------
 # Product-id → tier resolution
@@ -435,16 +492,19 @@ class _FakeResponse:
 
 class _FakeClient:
     def __init__(self, responses: list[Any]) -> None:
-        self._responses = responses
+        self.responses = responses
         self.calls: list[tuple[str, str]] = []
+        self.kwargs: list[dict[str, Any]] = []
 
     def post(self, url: str, **kwargs: Any) -> Any:
         self.calls.append(("POST", url))
-        return self._responses.pop(0)
+        self.kwargs.append(kwargs)
+        return self.responses.pop(0)
 
     def get(self, url: str, **kwargs: Any) -> Any:
         self.calls.append(("GET", url))
-        return self._responses.pop(0)
+        self.kwargs.append(kwargs)
+        return self.responses.pop(0)
 
     def close(self) -> None:
         return None
@@ -456,7 +516,6 @@ def fake_http_client(monkeypatch: pytest.MonkeyPatch) -> _FakeClient:
     import app.billing.dodo as dodo_mod
 
     fake = _FakeClient([])
-    fake.responses = fake._responses  # convenience alias for tests
 
     class _CM:
         def __enter__(self) -> _FakeClient:
@@ -489,11 +548,13 @@ class TestDodoClient:
             customer_email="a@b.com",
             customer_name="Ann",
             return_url="https://example.com/success",
+            metadata={"dataforge_user_id": "internal-user-1"},
         )
         assert result["session_id"] == "cs_123"
         assert result["checkout_url"].startswith("https://")
         assert fake_http_client.calls[0][0] == "POST"
         assert fake_http_client.calls[0][1] == "https://test.dodopayments.com/checkouts"
+        assert fake_http_client.kwargs[0]["json"]["metadata"] == {"dataforge_user_id": "internal-user-1"}
 
     def test_create_checkout_session_requires_product_id(self, fake_http_client: _FakeClient) -> None:
         from app.billing.dodo import DodoClient
@@ -600,6 +661,7 @@ class TestReconcileEntitlements:
         from app.billing.webhooks import get_customer_subscription
 
         sub = get_customer_subscription("user_recon_001")
+        assert sub is not None
         assert sub["plan_tier"] == "pro"
 
     def test_reconcile_downgrades_cancelled(
@@ -621,6 +683,7 @@ class TestReconcileEntitlements:
         from app.billing.webhooks import get_customer_subscription
 
         sub = get_customer_subscription("user_recon_001")
+        assert sub is not None
         assert sub["plan_tier"] == "free"
         assert sub["status"] == "canceled"
 
@@ -643,6 +706,7 @@ class TestReconcileEntitlements:
         from app.billing.webhooks import get_customer_subscription
 
         sub = get_customer_subscription("user_recon_001")
+        assert sub is not None
         assert sub["status"] == "past_due"
         assert sub["plan_tier"] == "starter", "tier preserved on hold"
 
@@ -668,6 +732,7 @@ class TestReconcileEntitlements:
         from app.billing.webhooks import get_customer_subscription
 
         sub = get_customer_subscription("user_recon_001")
+        assert sub is not None
         assert sub["plan_tier"] == "starter", "API outage must not mass-downgrade"
 
     def test_reconcile_skips_free_records_without_subscription(

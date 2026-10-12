@@ -64,7 +64,7 @@ VALUE_PATTERNS = {
         r"\d+[\d,]*\s*(inr|usd|eur|gbp|aud|cad)",  # 5000 INR, 100 USD
         r"(rs\.?|rupees?)\s*\d+",  # Rs 500, Rupees 1000
         # 25L, 1.2Cr, 50K
-        r"\d+\.?\d*\s*(cr|crore|l|lakh|k|m|mn|million|thousand)",
+        r"\d+\.?\d*\s*(cr|crore|l|lakh|k|m|mn|million|thousand)\b",
     ],
     "date": [
         r"\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}",  # 22 - 05 - 2026, 05 / 22 / 2026
@@ -176,11 +176,11 @@ def detect_page_structure(html: str) -> StructureProfile:
         return structure
 
     structure = _detect_list_structure(soup)
-    if structure and structure.structure_confidence > 0.7:
+    if structure and structure.structure_confidence >= 0.6:
         return structure
 
     structure = _detect_key_value_structure(soup)
-    if structure and structure.structure_confidence > 0.6:
+    if structure and structure.structure_confidence >= 0.6:
         return structure
 
     # Default to mixed
@@ -228,59 +228,69 @@ def _detect_table_structure(soup: BeautifulSoup) -> StructureProfile | None:
 
 def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:
     """Detect if page uses card / listings structure."""
-    # Card indicators (generic, not domain-specific)
-    card_selectors: list[tuple[str, dict[str, Any]]] = [
-        ("div", {"class": re.compile(r"(card|item|result|listing|product)", re.IGNORECASE)}),
-        ("article", {}),
-        ("li", {"class": re.compile(r"(item|result)", re.IGNORECASE)}),
-        ("div", {"class": re.compile(r"(grid|grid-item|col)", re.IGNORECASE)}),
-    ]
+    # Group every classed element, not only classes named ``card`` or
+    # ``product``. Real pages commonly use semantic names such as ``quote``
+    # or opaque component names. Layout classes are excluded so a repeated
+    # row/column wrapper cannot outrank the records nested inside it.
+    groups: dict[str, list[Any]] = {}
+    seen_by_selector: dict[str, set[int]] = {}
+    for element in soup.find_all(True):
+        if isinstance(element, str):
+            continue
+        classes = [str(cls) for cls in element.get("class", [])]
+        selectors = [f"{element.name}.{cls}" for cls in classes if _is_layout_neutral_class(cls)]
+        if not selectors and element.name == "article" and not classes:
+            selectors = ["article"]
+        for selector in selectors:
+            seen = seen_by_selector.setdefault(selector, set())
+            if id(element) in seen:
+                continue
+            seen.add(id(element))
+            groups.setdefault(selector, []).append(element)
 
+    best_selector = ""
     best_container = None
     best_headers: list[str] = []
-    sample_texts: list[str] = []
-    max_items = 0
+    best_sample_texts: list[str] = []
+    best_rank: tuple[int, float, int, float] = (0, 0.0, 0, 0.0)
     confidence = 0.0
 
-    for tag, attrs in card_selectors:
-        containers = soup.find_all(tag, attrs)
-        if not containers:
+    for selector, group in groups.items():
+        if len(group) < 2:
             continue
+        texts = [item.get_text(" ", strip=True) for item in group[:20] if item.get_text(" ", strip=True)]
+        if len(texts) < 2:
+            continue
+        nested_value_count = sum(len(item.find_all(True, recursive=False)) >= 2 for item in group[:20])
+        if not any(len(text) > 20 for text in texts) and nested_value_count < 2:
+            continue
+        item_count = len(group)
+        descendant_avg = sum(len(item.find_all(True)) for item in group[:20]) / max(len(group[:20]), 1)
+        avg_length = sum(len(text) for text in texts) / max(len(texts), 1)
+        # Prefer repeated, data-bearing records; for equal counts, nested
+        # child values distinguish a record from a repeated leaf field.
+        # Structural richness comes first because a field such as a title can
+        # occur more than once per record, while the record itself carries the
+        # complete set of sibling values.
+        rank = (nested_value_count, descendant_avg, item_count, avg_length)
+        candidate_confidence = min(0.5 + (min(item_count, 3) / 10) + (avg_length / 1000), 0.9)
 
-        # Check if these are actual data cards (not just styled divs)
-        item_count = 0
+        if rank > best_rank:
+            best_rank = rank
+            best_selector = selector
+            best_container = group[0]
+            confidence = candidate_confidence
+            best_sample_texts = [text[:200] for text in texts[:3]]
+            best_headers = [
+                heading.get_text(strip=True) for heading in best_container.find_all(["h1", "h2", "h3", "h4", "strong", "b"])[:5]
+            ]
 
-        for container in containers[:20]:
-            if isinstance(container, str):
-                continue
-            text = container.get_text(strip=True)
-            if len(text) > 50:  # Has substantial content
-                item_count += 1
-                if len(sample_texts) < 3:
-                    sample_texts.append(text[:200])
-
-        if item_count > 2:
-            # Calculate confidence based on consistency
-            avg_length = sum(len(t) for t in sample_texts) / max(len(sample_texts), 1)
-            confidence = min(0.4 + (item_count / 10) + (avg_length / 500), 0.9)
-
-            if item_count > max_items:
-                max_items = item_count
-                best_container = containers[0].parent or containers[0]
-                # Try to extract headers from first card
-                headers = []
-                if containers:
-                    first_container = containers[0]
-                    for h in first_container.find_all(["h1", "h2", "h3", "h4", "strong", "b"])[:5]:
-                        headers.append(h.get_text(strip=True))
-                best_headers = headers
-
-    if max_items < 3:
+    if not best_selector:
         return None
 
     # Generate CSS selector
-    container_sel = "div[class*='card'], div[class*='item'], article"
-    if best_container is not None:
+    container_sel = best_selector or "div[class*='card'], div[class*='item'], article"
+    if best_container is not None and not best_selector:
         container_sel = _generate_container_selector(best_container)
 
     return StructureProfile(
@@ -288,8 +298,38 @@ def _detect_cards_structure(soup: BeautifulSoup) -> StructureProfile | None:
         container_selector=container_sel,
         headers=best_headers,
         structure_confidence=confidence,
-        sample_containers=sample_texts[:3],
+        sample_containers=best_sample_texts[:3],
     )
+
+
+_LAYOUT_CLASS_TOKENS = {
+    "body",
+    "container",
+    "content",
+    "footer",
+    "grid",
+    "header",
+    "layout",
+    "list",
+    "main",
+    "nav",
+    "page",
+    "row",
+    "section",
+    "shell",
+    "sidebar",
+    "wrapper",
+}
+
+
+def _is_layout_neutral_class(value: str) -> bool:
+    """Return whether a class token is safe to consider as a record candidate."""
+    tokens = [token for token in re.split(r"[^a-z0-9]+", value.lower()) if token]
+    if not tokens:
+        return False
+    if any(token in _LAYOUT_CLASS_TOKENS for token in tokens):
+        return False
+    return not any(token.startswith(("col", "offset", "row", "span")) for token in tokens)
 
 
 def _detect_list_structure(soup: BeautifulSoup) -> StructureProfile | None:
@@ -300,7 +340,9 @@ def _detect_list_structure(soup: BeautifulSoup) -> StructureProfile | None:
     max_items = 0
 
     for lst in lists:
-        items = lst.find_all("li")
+        direct_items = lst.find_all("li", recursive=False)
+        all_items = lst.find_all("li")
+        items = direct_items if len(direct_items) > 5 else all_items
         if len(items) > 5 and len(items) > max_items:
             max_items = len(items)
             best_list = lst
@@ -308,7 +350,7 @@ def _detect_list_structure(soup: BeautifulSoup) -> StructureProfile | None:
     if not best_list or max_items < 5:
         return None
 
-    container_sel = f"{best_list.name} li"
+    container_sel = _scoped_list_selector(best_list)
     confidence = min(0.5 + (max_items / 50), 0.8)
 
     return StructureProfile(
@@ -343,10 +385,14 @@ def _detect_key_value_structure(soup: BeautifulSoup) -> StructureProfile | None:
         if len(rows) > 2:
             first_row = rows[0].find_all(["td", "th"])
             if len(first_row) == 2:  # Two columns
-                headers = [cell.get_text(strip=True) for cell in first_row]
+                headers = [
+                    cells[0].get_text(strip=True)
+                    for row in rows[:10]
+                    if (cells := row.find_all(["td", "th"], recursive=False)) and len(cells) == 2
+                ]
                 return StructureProfile(
                     structure_type="key_value",
-                    container_selector="table tr",
+                    container_selector="table",
                     headers=headers,
                     structure_confidence=0.6,
                     sample_containers=[str(rows[0])],
@@ -365,6 +411,45 @@ def _generate_container_selector(element) -> str:
             return f"{tag}.{class_sel}"
         return tag  # type: ignore[no-any-return]
     return "div"
+
+
+def _unique_ancestor_selector(element: Tag) -> str:
+    """Build a tag path that remains unique when wrappers repeat."""
+    segments: list[str] = []
+    current: Tag | None = element
+    while isinstance(current, Tag) and current.name not in {None, "[document]", "body", "html"}:
+        parent = getattr(current, "parent", None)
+        if not isinstance(parent, Tag) or parent.name in {None, "[document]"}:
+            segments.append(f"{current.name}:nth-of-type(1):not({current.name} {current.name})")
+            break
+
+        siblings = parent.find_all(current.name, recursive=False)
+        sibling_index = siblings.index(current) + 1 if current in siblings else 1
+        segment = current.name
+        if len(siblings) > 1:
+            segment = f"{segment}:nth-of-type({sibling_index})"
+        segments.append(segment)
+        current = parent
+
+    return " > ".join(reversed(segments))
+
+
+def _scoped_list_selector(list_element: Tag) -> str:
+    """Build a selector for one list while excluding nested list records."""
+    list_tag = list_element.name or "ul"
+    parent = getattr(list_element, "parent", None)
+    if not isinstance(parent, Tag) or getattr(parent, "name", None) in {None, "[document]"}:
+        return f"{list_tag}:nth-of-type(1):not({list_tag} {list_tag}) > li"
+
+    sibling_lists = parent.find_all(list_tag, recursive=False)
+    list_index = sibling_lists.index(list_element) + 1 if list_element in sibling_lists else 1
+    list_selector = list_tag if len(sibling_lists) <= 1 else f"{list_tag}:nth-of-type({list_index})"
+
+    if parent.name in {"body", "html"}:
+        return f"{parent.name} > {list_selector} > li"
+
+    parent_selector = _unique_ancestor_selector(parent)
+    return f"{parent_selector} > {list_selector} > li"
 
 
 def detect_value_patterns(html: str) -> ValuePatterns:
@@ -456,7 +541,11 @@ def detect_value_patterns(html: str) -> ValuePatterns:
     for pattern_type, regexes in VALUE_PATTERNS.items():
         samples = []
         for regex in regexes:
-            matches = re.findall(regex, text, re.IGNORECASE)
+            # Three-letter codes are conventionally uppercase. Applying a
+            # case-insensitive flag here turns ordinary prose (for example
+            # "far") into a false code candidate and later a fake field.
+            flags = 0 if pattern_type == "code_3letter" else re.IGNORECASE
+            matches = re.findall(regex, text, flags)
             samples.extend(matches[:10])
 
         attr_name = pattern_map.get(pattern_type)

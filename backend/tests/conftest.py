@@ -48,6 +48,8 @@ _TEST_ENV_KEYS = (
     "DATAFORGE_OPERATOR_API_KEY",
     "DATAFORGE_STORAGE_BACKEND",
     "DATAFORGE_DATABASE_URL",
+    "DATAFORGE_IDENTITY_DB_PATH",
+    "DATAFORGE_SESSION_DB_PATH",
     "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES",
 )
 _TEST_ENV_DEFAULTS = {
@@ -59,6 +61,8 @@ _TEST_ENV_DEFAULTS = {
     "DATAFORGE_ADMIN_API_KEY": "",
     "DATAFORGE_OPERATOR_API_KEY": "",
     "DATAFORGE_STORAGE_BACKEND": "sqlite",
+    "DATAFORGE_IDENTITY_DB_PATH": str(ROOT / "backend" / "data" / "identity_test.db"),
+    "DATAFORGE_SESSION_DB_PATH": str(ROOT / "backend" / "data" / "session_test.db"),
     "DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES": "true",
 }
 # When running under pytest-xdist each worker process needs its own
@@ -69,6 +73,8 @@ _worker_id: str | None = os.environ.get("PYTEST_XDIST_WORKER")
 if _worker_id:
     stem, _dot, _ext = "jobs_state_test.json".partition(".")
     _TEST_ENV_DEFAULTS["DATAFORGE_STATE_FILE"] = str(ROOT / "backend" / "data" / f"{stem}_{_worker_id}.{_ext}")
+    _TEST_ENV_DEFAULTS["DATAFORGE_IDENTITY_DB_PATH"] = str(ROOT / "backend" / "data" / f"identity_test_{_worker_id}.db")
+    _TEST_ENV_DEFAULTS["DATAFORGE_SESSION_DB_PATH"] = str(ROOT / "backend" / "data" / f"session_test_{_worker_id}.db")
 del _worker_id
 _HOST_ENV_BEFORE_TESTS = {key: os.environ.get(key) for key in _TEST_ENV_KEYS}
 _key = _value = ""  # will be overwritten by the loop (dict is non-empty by construction)
@@ -128,6 +134,13 @@ def pytest_addoption(parser) -> None:
             help="Run tests marked with @pytest.mark.hostile_ci_smoke against "
             "backend/benchmarks/benchmark_hostile.py (requires Playwright and local socket binding).",
         )
+    with contextlib.suppress(ValueError):
+        parser.addoption(
+            "--run-live-benchmark",
+            action="store_true",
+            default=False,
+            help="Collect tests marked with @pytest.mark.live_benchmark; also requires DATAFORGE_RUN_LIVE_BENCHMARKS=true.",
+        )
 
 
 def pytest_configure(config) -> None:
@@ -150,6 +163,11 @@ def pytest_configure(config) -> None:
         "endpoints (/infinite, /lazy) alongside the JS-resident lazy fixture for "
         "end-to-end hostile-path coverage on CI. Skipped by default "
         "(use --run-hostile-ci-smoke to opt in).",
+    )
+    config.addinivalue_line(
+        "markers",
+        "live_benchmark: tests that hit the live benchmark corpus. Skipped by default "
+        "(use --run-live-benchmark and DATAFORGE_RUN_LIVE_BENCHMARKS=true).",
     )
     config.addinivalue_line(
         "markers",
@@ -191,7 +209,7 @@ def pytest_configure(config) -> None:
                 port=port,
             )
 
-        PostgresContainer.get_connection_url = patched_get_connection_url
+        PostgresContainer.get_connection_url = patched_get_connection_url  # type: ignore[method-assign]
     except Exception:  # noqa: RUF100, S110
         pass
 
@@ -200,6 +218,9 @@ def pytest_collection_modifyitems(config, items) -> None:
     skip_postgres = pytest.mark.skip(reason="need --run-postgres to run (Postgres integration tests)")
     skip_golden = pytest.mark.skip(reason="need --run-golden-dataset to run (network-dependent golden dataset validation)")
     skip_browser = pytest.mark.skip(reason="need --run-browser to run (requires Playwright and local socket binding)")
+    skip_live_benchmark = pytest.mark.skip(
+        reason="need --run-live-benchmark and DATAFORGE_RUN_LIVE_BENCHMARKS=true to run live benchmarks",
+    )
     for item in items:
         if "postgres" in item.keywords and not config.getoption("--run-postgres", default=False):
             item.add_marker(skip_postgres)
@@ -216,6 +237,8 @@ def pytest_collection_modifyitems(config, items) -> None:
                     reason="need --run-hostile-ci-smoke to run (benchmark_hostile.py FastAPI server + Playwright reader)",
                 ),
             )
+        if "live_benchmark" in item.keywords and not config.getoption("--run-live-benchmark", default=False):
+            item.add_marker(skip_live_benchmark)
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:
@@ -260,6 +283,10 @@ def pytest_sessionfinish(session, exitstatus) -> None:
         for p in data_dir.glob("jobs_state_test_gw*.json*"):
             with contextlib.suppress(OSError):
                 p.unlink()
+        for prefix in ("identity_test", "session_test"):
+            for p in data_dir.glob(f"{prefix}*.db*"):
+                with contextlib.suppress(OSError):
+                    p.unlink()
     except Exception:
         logger.warning("Failed to clean up job state files", exc_info=True)
 

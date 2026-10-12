@@ -210,6 +210,19 @@ class TestPrepareRecordsForAi:
 class TestProcessRawRecords:
     """Tests for process_raw_records()."""
 
+    def test_schema_complete_short_entity_is_not_removed_as_semantic_noise(self) -> None:
+        schema = [
+            SchemaField(name="availability", field_type=FieldType.BOOLEAN),
+            SchemaField(name="name", field_type=FieldType.STRING),
+            SchemaField(name="price", field_type=FieldType.CURRENCY),
+        ]
+        records = [{"availability": True, "name": "Olio", "price": "£23.88"}]
+
+        result = process_raw_records(records, schema, 0.35)
+
+        assert len(result) == 1
+        assert result[0]["name"] == "Olio"
+
     def test_empty_input_returns_empty(self) -> None:
         assert process_raw_records([], SIMPLE_SCHEMA, 0.0) == []
 

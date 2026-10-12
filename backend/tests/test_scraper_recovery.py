@@ -387,7 +387,31 @@ class TestSolveCaptchaHandler:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_captcha_recovery_injects_token_on_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_captcha_recovery_never_injects_solver_tokens(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A configured or mocked solver must not turn a challenge into access."""
+        from unittest.mock import AsyncMock
+
+        from app.recovery_strategies import AttemptContext, RecoveryAction, RecoveryExecutor
+
+        mock_solver = AsyncMock()
+        mock_solver.solve = AsyncMock(return_value="must-not-be-injected")
+        monkeypatch.setattr("app.captcha_solver.get_captcha_solver", lambda: mock_solver)
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+        ctx = AttemptContext()
+
+        result = await executor.action_handlers[RecoveryAction.SOLVE_CAPTCHA](
+            {},
+            {"url": "https://example.com", "site_key": "site-key-abc", "captcha_type": "recaptcha"},
+            ctx,
+        )
+
+        assert result is False
+        assert "captcha_token" not in ctx.cookies
+
+    @pytest.mark.asyncio
+    async def test_captcha_recovery_does_not_inject_token_when_solver_is_mocked(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from unittest.mock import AsyncMock
 
         from app.config import settings
@@ -425,9 +449,8 @@ class TestSolveCaptchaHandler:
                 ctx,
             )
 
-        # Solver succeeded → token injected
-        assert result is True
-        assert ctx.cookies.get("captcha_token") == "solved-token-xyz"
+        assert result is False
+        assert "captcha_token" not in ctx.cookies
 
     @pytest.mark.asyncio
     async def test_captcha_recovery_no_url_returns_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -485,7 +508,29 @@ class TestHarvestCfClearanceHandler:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_cf_harvest_recovery_injects_cookies_on_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_cf_harvest_recovery_never_replays_challenge_cookies(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Challenge-clearance cookies must never be harvested or replayed."""
+        from unittest.mock import AsyncMock
+
+        from app.recovery_strategies import AttemptContext, RecoveryAction, RecoveryExecutor
+
+        monkeypatch.setattr("app.cf_harvester.harvest_cf_clearance", AsyncMock(return_value="cf_clearance=must-not-replay"))
+
+        executor = RecoveryExecutor()
+        _register_all_handlers(executor)
+        ctx = AttemptContext()
+
+        result = await executor.action_handlers[RecoveryAction.HARVEST_CF_CLEARANCE](
+            {},
+            {"url": "https://example.com", "domain": "example.com"},
+            ctx,
+        )
+
+        assert result is False
+        assert "cf_clearance" not in ctx.cookies
+
+    @pytest.mark.asyncio
+    async def test_cf_harvest_recovery_does_not_inject_cookies_when_mocked(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from unittest.mock import AsyncMock
 
         from app.config import settings
@@ -511,8 +556,8 @@ class TestHarvestCfClearanceHandler:
                 ctx,
             )
 
-        assert result is True
-        assert ctx.cookies.get("cf_clearance") == "abc123"
+        assert result is False
+        assert "cf_clearance" not in ctx.cookies
 
     @pytest.mark.asyncio
     async def test_cf_harvest_returns_false_on_harvest_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:

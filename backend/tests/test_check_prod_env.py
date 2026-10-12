@@ -215,6 +215,14 @@ class TestCheckProdEnvValidators:
         assert not mod.check_worker_queue("no")
         assert not mod.check_worker_queue("")
 
+    def test_protection_bypass_features_must_remain_disabled(self) -> None:
+        """Production must fail closed for CAPTCHA and challenge harvesting."""
+        mod = self._import_module()
+        assert mod.check_protection_bypass_disabled("false")
+        assert mod.check_protection_bypass_disabled("0")
+        assert not mod.check_protection_bypass_disabled("true")
+        assert not mod.check_protection_bypass_disabled("yes")
+
     def test_check_database_url_accepts_postgresql(self) -> None:
         """postgresql:// URLs should pass."""
         mod = self._import_module()

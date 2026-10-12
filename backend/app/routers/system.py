@@ -25,8 +25,9 @@ from app.selector_discovery import analyze_url_for_fields
 from app.storage_interface import get_job_repository
 from app.url_analyzer import analyze_url as _url_analyze
 from app.url_safety import validate_public_http_url
+from app.utils.aup import require_aup_accepted
 from app.utils.datetime_normalization import parse_datetime
-from app.utils.rbac import UserRole, require_role
+from app.utils.rbac import UserRole, require_principal, require_role
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["system"])
@@ -441,9 +442,13 @@ async def rate_limit_stats(
 @router.post("/api/url/analyze", response_model=dict)
 async def analyze_url(
     req: URLPreviewRequest,
-    _role: Annotated[UserRole, Depends(require_role([UserRole.ADMIN, UserRole.OPERATOR]))],
+    _principal: Annotated[
+        tuple[UserRole, str, str, str],
+        Depends(require_principal([UserRole.ADMIN, UserRole.OPERATOR, UserRole.USER])),
+    ],
+    _aup_check: Annotated[dict[str, Any], Depends(require_aup_accepted)],
 ):
-    """Analyze a URL and auto-detect what data fields can be extracted."""
+    """Analyze a URL and auto-detect fields for the authenticated user's schema."""
     intelligence = _url_analyze(req.url)
     redacted_url = intelligence.to_dict()["url"]
     try:

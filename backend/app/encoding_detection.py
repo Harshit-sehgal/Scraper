@@ -108,7 +108,7 @@ def _detect_via_library(content: bytes) -> str | None:
         results = charset_normalizer.from_bytes(content)
         best = results.best()
         if best is not None:
-            encoding_name = best.encoding()
+            encoding_name = best.encoding
             if encoding_name is not None:
                 normalised = _normalise_charset(encoding_name)
                 if normalised is not None:
@@ -205,6 +205,23 @@ def _looks_like_binary(content: bytes) -> bool:
     return len(sample) > 0 and (control_count / len(sample)) > 0.30
 
 
+def _looks_like_gb2312(content: bytes) -> bool:
+    """Recognise common GB2312 byte pairs when optional detectors are absent."""
+    pairs = 0
+    valid_pairs = 0
+    index = 0
+    while index + 1 < len(content):
+        first, second = content[index], content[index + 1]
+        if first >= 0x80:
+            pairs += 1
+            if 0xA1 <= first <= 0xF7 and 0xA1 <= second <= 0xFE:
+                valid_pairs += 1
+            index += 2
+        else:
+            index += 1
+    return pairs >= 2 and valid_pairs / pairs >= 0.75
+
+
 # ─── Public API ────────────────────────────────────────────────────────────
 
 
@@ -250,11 +267,16 @@ def detect_encoding(content: bytes, declared_charset: str | None = None) -> str:
     if meta_codec is not None:
         return meta_codec
 
-    # 5. UTF-8 heuristic.
+    # 5. Common CJK legacy encoding heuristic. This keeps pages readable in
+    # minimal deployments where optional charset detectors are not installed.
+    if _looks_like_gb2312(content):
+        return "gb2312"
+
+    # 6. UTF-8 heuristic.
     if _is_likely_utf8(content):
         return "utf-8"
 
-    # 6. Final fallback: iso-8859-1 (Latin-1) — never fails, every byte is valid.
+    # 7. Final fallback: iso-8859-1 (Latin-1) — never fails, every byte is valid.
     return "iso-8859-1"
 
 

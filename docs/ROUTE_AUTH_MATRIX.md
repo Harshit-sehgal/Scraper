@@ -4,9 +4,9 @@
 
 **Command:** `python3 scripts/generate_route_auth_matrix.py`
 
-**API route rows:** 187
+**API route rows:** 188
 **Unknown auth rows:** 0
-**Unknown tenant-scope rows:** 2
+**Unknown tenant-scope rows:** 0
 
 Unknown auth or tenant-scope rows must be tracked as candidate issues.
 
@@ -21,19 +21,19 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/auth-profiles/{profile_id}/start-login` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/auth-profiles/{profile_id}/validate` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/billing/checkout` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/billing/dodo/checkout` | protected | authenticated-user | require_role | yes | unknown | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed Tenant scope unknown; candidate follow-up required. |
-| `POST` | `/api/billing/dodo/webhook` | protected | authenticated-user | none | yes | unknown | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed Tenant scope unknown; candidate follow-up required. |
-| `GET` | `/api/billing/stub-return/{plan_tier}/{request_id}` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency |
+| `POST` | `/api/billing/dodo/checkout` | protected | authenticated-user | require_principal | yes | yes | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
+| `POST` | `/api/billing/dodo/webhook` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
+| `GET` | `/api/billing/stub-return/{plan_tier}/{request_id}` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/billing/subscriptions` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/billing/subscriptions/{customer_id}` | protected | operator-or-admin | require_principal, require_role | yes | no | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/billing/webhook` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
+| `POST` | `/api/billing/webhook` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `POST` | `/api/compliance/gdpr/forget` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/discover` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/discover` | protected | authenticated-user | require_aup_accepted, require_principal | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/discover/sitemap` | protected | operator-or-admin | require_principal | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/download/{filename}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/exports/batch` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/jobs` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/jobs` | protected | operator-or-admin | require_plan_limit.<locals>.dependency, require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/jobs` | protected | authenticated-user | require_aup_accepted, require_plan_limit.<locals>.dependency, require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/jobs/batch` | protected | operator-or-admin | require_role | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/jobs/cleanup/terminal` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/jobs/{job_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
@@ -92,6 +92,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/saas/email-verification/verify` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/invitations/pending` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/invitations/{invitation_id}/respond` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/saas/login` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/saas/me` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `DELETE` | `/api/saas/memberships/{membership_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/saas/orgs` | protected | authenticated-user | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator/user |
@@ -102,8 +103,8 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `POST` | `/api/saas/orgs/{org_id}/invitations` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/saas/orgs/{org_id}/members` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/saas/orgs/{org_id}/projects` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
-| `POST` | `/api/saas/password-reset/request` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
-| `POST` | `/api/saas/password-reset/reset` | protected | authenticated-user | none | yes | no | yes | stable | protected by global /api middleware; no route-level role dependency; mutation role should be reviewed |
+| `POST` | `/api/saas/password-reset/request` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
+| `POST` | `/api/saas/password-reset/reset` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/saas/plan` | protected | authenticated-user | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `POST` | `/api/saas/projects` | protected | operator-or-admin | require_aup_accepted, require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/saas/projects/{project_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
@@ -113,13 +114,13 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `DELETE` | `/api/saas/projects/{project_id}/keys/{key_id}` | protected | operator-or-admin | require_role_with_user | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/saas/signup` | public | none | none | no | no | yes | stable | explicit API middleware exemption |
 | `GET` | `/api/saas/usage` | protected | authenticated-user | require_role_with_user | yes | no | yes | stable | route dependency accepts admin/operator/user |
-| `GET` | `/api/scheduled` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/scheduled` | protected | operator-or-admin | require_aup_accepted, require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `DELETE` | `/api/scheduled/{job_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/scheduled/{job_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `PUT` | `/api/scheduled/{job_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `GET` | `/api/scheduled/{job_id}/changes` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/schema/suggest` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `GET` | `/api/scheduled` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/scheduled` | protected | authenticated-user | require_aup_accepted, require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `DELETE` | `/api/scheduled/{job_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/scheduled/{job_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `PUT` | `/api/scheduled/{job_id}` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `GET` | `/api/scheduled/{job_id}/changes` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |
+| `POST` | `/api/schema/suggest` | protected | authenticated-user | require_aup_accepted, require_principal | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/scraper/browser` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `GET` | `/api/scraper/config` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/scraper/diagnostics` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
@@ -182,7 +183,7 @@ Unknown auth or tenant-scope rows must be tracked as candidate issues.
 | `DELETE` | `/api/templates/{template_id}` | protected | admin | require_principal | yes | yes | yes | stable | require_role/admin-only dependency |
 | `GET` | `/api/templates/{template_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `PATCH` | `/api/templates/{template_id}` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
-| `POST` | `/api/url/analyze` | protected | operator-or-admin | require_role | yes | no | yes | stable | route dependency accepts admin/operator |
+| `POST` | `/api/url/analyze` | protected | authenticated-user | require_aup_accepted, require_principal | yes | no | yes | stable | route dependency accepts admin/operator/user |
 | `GET` | `/api/usage/stats` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `POST` | `/api/usage/stats/record` | protected | operator-or-admin | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator |
 | `DELETE` | `/api/user/data` | protected | authenticated-user | require_principal | yes | yes | yes | stable | route dependency accepts admin/operator/user |

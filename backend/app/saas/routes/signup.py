@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from app.audit_logger import log_job_event
+from app.auth.session import set_session_cookie
 from app.saas.identity_store import IdentityStoreError, get_identity_store
-from app.saas.service import SignupService
+from app.saas.models import UserStatus
+from app.saas.service import SignupService, verify_password
 from app.utils.log_redaction import redact_pii
+from app.utils.rbac import UserRole
 
 from ._common import (
+    _LOGIN_LIMITERS,
     _PASSWORD_RESET_CONFIRM_LIMITERS,
     _PASSWORD_RESET_REQUEST_LIMITERS,
     _SIGNUP_LIMITERS,
@@ -47,7 +51,7 @@ class SignupResponse(BaseModel):
 
 
 @router.post("/signup", status_code=201)
-async def signup(body: SignupRequest, request: Request) -> SignupResponse:
+async def signup(body: SignupRequest, request: Request, response: Response) -> SignupResponse:
     """Create a new user with a default organization and project.
 
     Rate-limited to 3 signups per 5 minutes per IP address to prevent
@@ -99,11 +103,97 @@ async def signup(body: SignupRequest, request: Request) -> SignupResponse:
         details={"email": redact_pii(result.user.email), "org_id": result.organization.id, "project_id": result.project.id},
     )
 
+    # Complete the activation loop without exposing an API key to the browser.
+    # The cookie carries the freshly-created tenant context and is HTTP-only.
+    set_session_cookie(
+        response,
+        UserRole.USER.value,
+        user_id=result.user.id,
+        org_id=result.organization.id,
+        project_id=result.project.id,
+    )
+
     return SignupResponse(
         user_id=result.user.id,
         email=result.user.email,
         organization_id=result.organization.id,
         project_id=result.project.id,
+    )
+
+
+class LoginRequest(BaseModel):
+    """Request body for returning-user password login."""
+
+    email: str = Field(..., max_length=320)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class LoginResponse(BaseModel):
+    """Response after a successful password login."""
+
+    user_id: str = Field(max_length=64)
+    email: str = Field(max_length=320)
+    organization_id: str = Field(max_length=64)
+    project_id: str = Field(max_length=64)
+    message: str = Field(default="Login successful.", max_length=1024)
+
+
+@router.post("/login", status_code=200)
+async def login(body: LoginRequest, request: Request, response: Response) -> LoginResponse:
+    """Authenticate a user with email/password and issue a tenant session.
+
+    All credential failures intentionally share one status and message so the
+    endpoint cannot be used to enumerate registered addresses. The session
+    context is selected from the persistent identity store, never from the
+    request body.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(_LOGIN_LIMITERS, client_ip, max_requests=10, window_seconds=300.0, action="login")
+    validated_email = _validate_email(body.email)
+    store = get_identity_store()
+    user = store.get_user_by_email(validated_email)
+
+    password_ok = verify_password(body.password, user.password_hash) if user is not None else False
+    if user is None or not password_ok or user.status is UserStatus.DISABLED:
+        logger.info("Login rejected for %s", redact_pii(validated_email))
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    memberships = [membership for membership in store.list_user_memberships(user.id) if membership.is_active()]
+    if not memberships:
+        logger.warning("Login rejected for user without an active organization: %s", user.id)
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    membership = memberships[0]
+    selected = store.get_selected(user.id)
+    project = None
+    if selected is not None and selected.org_id == membership.org_id and store.is_org_member(user.id, selected.org_id):
+        project = store.get_project(selected.project_id)
+    if project is None or project.org_id != membership.org_id:
+        projects = store.list_org_projects(membership.org_id)
+        project = projects[0] if projects else None
+    if project is None:
+        logger.warning("Login rejected for user without a project: %s", user.id)
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    set_session_cookie(
+        response,
+        UserRole.USER.value,
+        user_id=user.id,
+        org_id=membership.org_id,
+        project_id=project.id,
+    )
+    log_job_event(
+        actor=user.id,
+        action="user_login",
+        job_id="login",
+        outcome="success",
+        details={"email": redact_pii(user.email)},
+    )
+    return LoginResponse(
+        user_id=user.id,
+        email=user.email,
+        organization_id=membership.org_id,
+        project_id=project.id,
     )
 
 

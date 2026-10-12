@@ -9,7 +9,8 @@ export const endpoints = {
   systemStatus: "/api/system/status",
 
   jobs: "/api/jobs",
-  job: (id) => `/api/jobs/${encodeURIComponent(id)}`,
+  job: (id, includeResults = false) =>
+    `/api/jobs/${encodeURIComponent(id)}${includeResults ? "?include_results=true" : ""}`,
   cancelJob: (id) => `/api/jobs/${encodeURIComponent(id)}/cancel`,
   deleteJob: (id) => `/api/jobs/${encodeURIComponent(id)}`,
   cleanupTerminalJobs: (keepRecent) => `/api/jobs/cleanup/terminal?keep_recent=${encodeURIComponent(keepRecent)}`,
@@ -44,7 +45,7 @@ export const endpoints = {
 
   billingPlan: "/api/saas/plan",
   billingSubscriptions: "/api/billing/subscriptions",
-  billingCheckout: "/api/billing/checkout",
+  billingCheckout: "/api/billing/dodo/checkout",
   aupStatus: "/api/saas/aup/status",
   aupAccept: "/api/saas/aup/accept",
   auditLog: (query) => `/api/system/audit-log?${query}`,

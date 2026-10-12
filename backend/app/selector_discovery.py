@@ -56,6 +56,7 @@ from app.url_value_classification import (
     _rename_generic_fields,
     _value_patterns_to_field_types,
     build_url_analysis_prompt,
+    infer_dom_field_suggestions,
 )
 
 # ── Satisfy pyflakes ────────────────────────────────────────────────────
@@ -122,6 +123,7 @@ __all__ = [
     "build_url_analysis_prompt",
     "clean_html_for_selectors",
     "discover_selectors",
+    "infer_dom_field_suggestions",
 ]
 
 

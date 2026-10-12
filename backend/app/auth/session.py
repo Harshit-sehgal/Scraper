@@ -36,6 +36,12 @@ SESSION_MAX_AGE = 86400  # 24 hours
 
 def _session_db_path() -> Path:
     """Resolve the server-side session registry path."""
+    session_path = getattr(settings, "SESSION_DB_PATH", "")
+    if session_path:
+        path = Path(session_path).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
     identity_path = getattr(settings, "IDENTITY_DB_PATH", "")
     if identity_path:
         path = Path(identity_path).expanduser().with_name("session.db")

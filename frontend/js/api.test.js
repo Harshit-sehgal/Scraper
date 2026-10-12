@@ -14,6 +14,7 @@ import {
   clearApiKey,
   apiFetch,
 } from "./api.js";
+import { endpoints } from "./api-contract.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -76,6 +77,13 @@ describe("API base URL", () => {
   it("resolves correctly in jsdom test environment", () => {
     // In jsdom, protocol is 'about:' so the fallback applies.
     expect(API).toBe("http://127.0.0.1:8000");
+  });
+});
+
+describe("job result endpoint helpers", () => {
+  it("can request a job with results for the results view", () => {
+    expect(endpoints.job("job/1", true)).toBe("/api/jobs/job%2F1?include_results=true");
+    expect(endpoints.job("job/1")).toBe("/api/jobs/job%2F1");
   });
 });
 

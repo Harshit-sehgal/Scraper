@@ -19,8 +19,13 @@ import logging
 import os
 import sys
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from app.config import settings
@@ -462,6 +467,21 @@ class SiteResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@contextmanager
+def _isolated_regression_capture() -> Iterator[Any]:
+    """Keep live benchmark failure captures out of the repository tree."""
+    from app.regression_capture import RegressionCapture
+
+    with TemporaryDirectory(prefix="dataforge-live-benchmark-") as root:
+        root_path = Path(root)
+        capture = RegressionCapture(
+            fixtures_dir=str(root_path / "fixtures"),
+            registry_path=str(root_path / "regression_registry.json"),
+        )
+        with patch("app.scraper.get_regression_capture", return_value=capture):
+            yield capture
+
+
 async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
     """Run scrape_url against one site and return structured results."""
     start = time.time()
@@ -559,9 +579,12 @@ async def run_site_check(site: SiteTest, index: int, total: int) -> SiteResult:
 
 
 async def run_all_tests():
-    """Run all 15 site tests and generate a report."""
+    """Run all configured site tests and generate a report."""
     # Configure for respectful crawling
     original_delay = settings.CRAWL_DEFAULT_DELAY_SECONDS
+    original_page_settle_delay = settings.PAGE_SETTLE_DELAY
+    original_playwright_timeout = settings.PLAYWRIGHT_TIMEOUT
+    original_request_timeout = settings.REQUEST_TIMEOUT
     settings.CRAWL_DEFAULT_DELAY_SECONDS = 2.0  # Be nice to servers
     settings.PAGE_SETTLE_DELAY = 3.0  # Allow JS rendering
     settings.PLAYWRIGHT_TIMEOUT = 30000
@@ -569,15 +592,19 @@ async def run_all_tests():
 
     results: list[SiteResult] = []
 
-    for i, site in enumerate(SITES, 1):
-        result = await run_site_check(site, i, len(SITES))
-        results.append(result)
-        # Respectful delay between sites
-        if i < len(SITES):
-            await asyncio.sleep(settings.CRAWL_DEFAULT_DELAY_SECONDS)
-
-    # Restore settings
-    settings.CRAWL_DEFAULT_DELAY_SECONDS = original_delay
+    try:
+        with _isolated_regression_capture():
+            for i, site in enumerate(SITES, 1):
+                result = await run_site_check(site, i, len(SITES))
+                results.append(result)
+                # Respectful delay between sites
+                if i < len(SITES):
+                    await asyncio.sleep(settings.CRAWL_DEFAULT_DELAY_SECONDS)
+    finally:
+        settings.CRAWL_DEFAULT_DELAY_SECONDS = original_delay
+        settings.PAGE_SETTLE_DELAY = original_page_settle_delay
+        settings.PLAYWRIGHT_TIMEOUT = original_playwright_timeout
+        settings.REQUEST_TIMEOUT = original_request_timeout
 
     return results
 

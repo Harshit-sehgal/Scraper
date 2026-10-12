@@ -211,23 +211,36 @@ class TestFactory:
         solver = get_captcha_solver()
         assert isinstance(solver, _NoOpSolver)
 
-    def test_returns_two_captcha_when_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_returns_noop_when_two_captcha_is_configured(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app.config import settings
 
         monkeypatch.setattr(settings, "CAPTCHA_SOLVER_ENABLED", True)
         monkeypatch.setattr(settings, "CAPTCHA_API_KEY", "fake-key-123")
         monkeypatch.setattr(settings, "CAPTCHA_PROVIDER", "2captcha")
         solver = get_captcha_solver()
-        assert isinstance(solver, _TwoCaptchaSolver)
+        assert isinstance(solver, _NoOpSolver)
 
-    def test_returns_anticaptcha_when_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_returns_noop_when_anticaptcha_is_configured(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app.config import settings
 
         monkeypatch.setattr(settings, "CAPTCHA_SOLVER_ENABLED", True)
         monkeypatch.setattr(settings, "CAPTCHA_API_KEY", "fake-key-456")
         monkeypatch.setattr(settings, "CAPTCHA_PROVIDER", "anticaptcha")
         solver = get_captcha_solver()
-        assert isinstance(solver, _AntiCaptchaSolver)
+        assert isinstance(solver, _NoOpSolver)
+
+    def test_never_enables_external_solver_even_when_configured(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Protected pages must remain fail-closed in every environment."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "CAPTCHA_SOLVER_ENABLED", True)
+        monkeypatch.setattr(settings, "CAPTCHA_API_KEY", "real-looking-key")
+        monkeypatch.setattr(settings, "CAPTCHA_PROVIDER", "2captcha")
+        reset_captcha_solver()
+
+        solver = get_captcha_solver()
+
+        assert isinstance(solver, _NoOpSolver)
 
     def test_unknown_provider_falls_back_to_noop(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app.config import settings

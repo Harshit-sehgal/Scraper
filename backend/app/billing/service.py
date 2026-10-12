@@ -51,9 +51,11 @@ _PLAN_ID_ENV_BY_TIER: dict[PlanTierId, str] = {
     PlanTierId.ENTERPRISE: "PAYPAL_PLAN_ID_ENTERPRISE",
 }
 _DEFAULT_PLAN_PRICES_USD: dict[PlanTierId, str] = {
-    PlanTierId.STARTER: "29.00",
-    PlanTierId.PRO: "99.00",
-    PlanTierId.ENTERPRISE: "299.00",
+    PlanTierId.STARTER: "15.00",
+    PlanTierId.PRO: "29.00",
+    # Enterprise pricing is negotiated; this legacy fallback is never used
+    # for the active Dodo checkout path.
+    PlanTierId.ENTERPRISE: "0.00",
 }
 
 # ---------------------------------------------------------------------------

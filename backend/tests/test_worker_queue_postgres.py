@@ -32,34 +32,25 @@ def _require_psycopg2() -> None:
 
 @pytest.fixture(scope="module")
 def module_postgres_container():
-    """Start a single Postgres testcontainer or reuse a running one.
+    """Start a single isolated Postgres testcontainer or use an explicit test DSN.
 
     Sets the DATAFORGE_* env vars so any code path that calls
     ``_get_database_url()`` picks up the container port instead of the
-    development fallback.
+    development fallback. ``DATAFORGE_TEST_POSTGRES_URL`` is the only
+    supported externally managed database override.
     """
-    import socket
-
-    use_running = False
-    dsn = os.environ.get("DATAFORGE_DATABASE_URL")
-    if dsn:
-        use_running = True
-    else:
-        try:
-            with socket.create_connection(("127.0.0.1", 5432), timeout=1):
-                use_running = True
-                os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
-                os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
-                os.environ["DATAFORGE_DATABASE_URL"] = "postgresql://testuser:testpassword@127.0.0.1:5432/testdb"
-        except (TimeoutError, ConnectionRefusedError):
-            pass
+    explicit_dsn = os.environ.get("DATAFORGE_TEST_POSTGRES_URL")
+    use_running = bool(explicit_dsn)
+    if explicit_dsn:
+        os.environ["DATAFORGE_STORAGE_BACKEND"] = "postgres"
+        os.environ["DATAFORGE_QUEUE_BACKEND"] = "postgres"
+        os.environ["DATAFORGE_DATABASE_URL"] = explicit_dsn
 
     if use_running:
         yield
-        if not dsn:
-            os.environ.pop("DATAFORGE_DATABASE_URL", None)
-            os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
-            os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
+        os.environ.pop("DATAFORGE_DATABASE_URL", None)
+        os.environ.pop("DATAFORGE_STORAGE_BACKEND", None)
+        os.environ.pop("DATAFORGE_QUEUE_BACKEND", None)
     else:
         from testcontainers.postgres import PostgresContainer
 

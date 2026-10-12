@@ -136,6 +136,16 @@ class Settings(
         return os.environ.get("DATAFORGE_STATE_FILE") or self.STATE_FILE_PATH
 
     @property
+    def IDENTITY_DB_PATH(self) -> str:
+        """Optional identity SQLite path, read dynamically for test/process isolation."""
+        return (os.environ.get("DATAFORGE_IDENTITY_DB_PATH") or "").strip()
+
+    @property
+    def SESSION_DB_PATH(self) -> str:
+        """Optional session SQLite path, read dynamically for test/process isolation."""
+        return (os.environ.get("DATAFORGE_SESSION_DB_PATH") or "").strip()
+
+    @property
     def TEST_SELECTOR_DECAY_PERSISTENCE(self) -> bool:
         """Whether to persist selector decay snapshots during tests."""
         return (os.environ.get("DATAFORGE_TEST_SELECTOR_DECAY_PERSISTENCE") or "").strip().lower() in ("true", "1", "yes")

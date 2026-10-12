@@ -395,6 +395,8 @@ class URLAnalysisPipeline:
         llm_json = _import_sd("llm_json")
         from bs4 import BeautifulSoup
 
+        from app.url_value_classification import infer_dom_field_suggestions
+
         container_values = extract_values(ctx.html, ctx.profile.container_selector)
 
         if len(container_values) < 3:
@@ -438,7 +440,21 @@ class URLAnalysisPipeline:
             logger.warning("[URLAnalyzer] LLM cascade exhausted for %s", ctx.url)
             result = None
 
-        ctx.suggested_fields = rename_fields(build_llm(result, ctx.patterns))
+        dom_fields = infer_dom_field_suggestions(ctx.html, ctx.profile.container_selector)
+        llm_fields = rename_fields(build_llm(result, ctx.patterns))
+        # Prefer fields with a deterministic selector inside repeated data
+        # containers. The LLM remains useful for record-count estimation, but
+        # page-wide regex matches must not become irrelevant result columns.
+        container_count = len(BeautifulSoup(ctx.html, "html.parser").select(ctx.profile.container_selector))
+        if dom_fields:
+            ctx.suggested_fields = dom_fields
+        elif container_count > 1:
+            # A repeated container is a record boundary. Without a scoped DOM
+            # selector, a regex match belongs to the page-wide evidence only;
+            # exposing it as a result column would create false schema fields.
+            ctx.suggested_fields = [field for field in llm_fields if field.get("selector")]
+        else:
+            ctx.suggested_fields = llm_fields
         ctx.suggested_fields.sort(key=lambda f: f.get("confidence", 0.0), reverse=True)
         ctx.suggested_fields = ctx.suggested_fields[: settings.URL_ANALYZER_MAX_FIELDS]
 
@@ -446,6 +462,8 @@ class URLAnalysisPipeline:
         ctx.estimated_records = 0
         if result and isinstance(result, dict):
             ctx.estimated_records = int(result.get("estimated_record_count", 0))
+        if ctx.estimated_records <= 0:
+            ctx.estimated_records = container_count
 
     # ── Stage 8: Response Building ───────────────────────────────────────
 

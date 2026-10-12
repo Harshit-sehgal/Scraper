@@ -47,14 +47,17 @@ class TestCheckpointIndexBasics:
         idx.add(300, "seg_c", 0, {"c": 3})
 
         # Exactly at a checkpoint → that checkpoint.
-        assert idx.find_nearest(200) is not None
-        assert idx.find_nearest(200)[1] == "seg_b"
+        nearest = idx.find_nearest(200)
+        assert nearest is not None
+        assert nearest[1] == "seg_b"
         # Between two checkpoints → the preceding one.
-        assert idx.find_nearest(250) is not None
-        assert idx.find_nearest(250)[1] == "seg_b"
+        nearest = idx.find_nearest(250)
+        assert nearest is not None
+        assert nearest[1] == "seg_b"
         # Above the last checkpoint → the last one.
-        assert idx.find_nearest(9999) is not None
-        assert idx.find_nearest(9999)[1] == "seg_c"
+        nearest = idx.find_nearest(9999)
+        assert nearest is not None
+        assert nearest[1] == "seg_c"
 
     def test_find_nearest_before_first_checkpoint_returns_none(self) -> None:
         """A target before the first checkpoint idx cannot be reconstructed."""
@@ -124,8 +127,9 @@ class TestCheckpointIndexRemoveSegment:
         # and there's nothing at-or-before 150.
         assert idx.find_nearest(150) is None
         # But seek at 200 still works.
-        assert idx.find_nearest(200) is not None
-        assert idx.find_nearest(200)[3] == {"b": 2}
+        nearest = idx.find_nearest(200)
+        assert nearest is not None
+        assert nearest[3] == {"b": 2}
 
 
 class TestCheckpointIndexToDictList:

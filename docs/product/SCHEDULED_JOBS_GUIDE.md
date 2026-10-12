@@ -1,19 +1,16 @@
 # Scheduled Jobs (E4.2)
 
 Run extraction on a schedule and track what changed between runs.
-Requires AUP acceptance; roles ADMIN or OPERATOR.
+Requires AUP acceptance. Persistent tenant users can manage their own
+scheduled jobs; admin/operator access remains scoped by the centralized RBAC
+policy.
 
 ## Create
 
 ```bash
-curl -X POST http://localhost:8000/api/scheduled-jobs \
+curl -X POST 'http://localhost:8000/api/scheduled?name=Books%20monitor&job_name=Books%20daily&frequency=daily&urls=https%3A%2F%2Fbooks.toscrape.com%2F' \
   -H "Authorization: Bearer $DATAFORGE_OPERATOR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "urls": ["https://books.toscrape.com/"],
-    "cron_expression": "0 6 * * *",
-    "frequency": "daily"
-  }'
+  -H "Accept: application/json"
 ```
 
 - `cron_expression` (standard 5-field cron: minute hour dom month dow)
@@ -26,7 +23,7 @@ curl -X POST http://localhost:8000/api/scheduled-jobs \
 ## Track changes
 
 ```bash
-curl -X GET http://localhost:8000/api/scheduled-jobs/{job_id}/changes \
+curl -X GET http://localhost:8000/api/scheduled/{job_id}/changes \
   -H "Authorization: Bearer $DATAFORGE_OPERATOR_API_KEY"
 ```
 
@@ -38,10 +35,10 @@ re-downloading everything.
 
 | Action | Endpoint |
 |---|---|
-| List | `GET /api/scheduled-jobs` |
-| Get | `GET /api/scheduled-jobs/{job_id}` |
-| Update | `PUT /api/scheduled-jobs/{job_id}` |
-| Delete | `DELETE /api/scheduled-jobs/{job_id}` |
+| List | `GET /api/scheduled` |
+| Get | `GET /api/scheduled/{job_id}` |
+| Update | `PUT /api/scheduled/{job_id}` |
+| Delete | `DELETE /api/scheduled/{job_id}` |
 
 Pausing: set the cron expression to a far-future schedule or delete
 the job; records and change history stay visible.

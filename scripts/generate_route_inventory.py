@@ -29,7 +29,13 @@ PUBLIC_API_EXEMPT = {
     "/api/session/me",
     "/api/system/csp-violations",
     "/api/saas/signup",
+    "/api/saas/login",
+    "/api/saas/password-reset/request",
+    "/api/saas/password-reset/reset",
+    "/api/billing/webhook",
+    "/api/billing/dodo/webhook",
 }
+PUBLIC_API_PREFIXES = ("/api/billing/stub-return/",)
 TENANT_SCOPED_PREFIXES = (
     "/api/download",
     "/api/jobs",
@@ -51,6 +57,7 @@ TENANT_SCOPED_PREFIXES = (
     "/api/saas/email-verification",
     "/api/saas/invitations",
     "/api/compliance",
+    "/api/billing/dodo/checkout",
 )
 GLOBAL_OR_NOT_TENANT_PREFIXES = (
     "/api/session",
@@ -64,8 +71,10 @@ GLOBAL_OR_NOT_TENANT_PREFIXES = (
     "/api/saas/plan",
     "/api/saas/usage",
     "/api/saas/password-reset",
+    "/api/saas/login",
     "/api/billing/subscriptions",
     "/api/billing/webhook",
+    "/api/billing/dodo/webhook",
     "/api/billing/checkout",
     "/api/billing/stub-return",
 )
@@ -148,7 +157,7 @@ def _access_for(path: str, method: str, roles: list[str]) -> tuple[str, str, str
         return ("public-dev-only", "development-docs", "FastAPI docs disabled by app config in production")
     if path in {"/", "/health", "/ready"} or path.startswith("/app"):
         return ("public", "", "non-API probe/static route")
-    if path in PUBLIC_API_EXEMPT:
+    if path in PUBLIC_API_EXEMPT or any(path.startswith(prefix) for prefix in PUBLIC_API_PREFIXES):
         return ("public", "", "explicit API middleware exemption")
     if roles == ["admin"]:
         return ("protected", "admin", "require_role/admin-only dependency")
@@ -169,7 +178,7 @@ def _access_for(path: str, method: str, roles: list[str]) -> tuple[str, str, str
 def _middleware_protected(path: str) -> str:
     if not path.startswith("/api/"):
         return "no"
-    return "no" if path in PUBLIC_API_EXEMPT else "yes"
+    return "no" if path in PUBLIC_API_EXEMPT or any(path.startswith(prefix) for prefix in PUBLIC_API_PREFIXES) else "yes"
 
 
 def tenant_scope_for(path: str) -> str:
@@ -191,7 +200,7 @@ def _category(path: str, stable_or_experimental: str) -> str:
         return "docs/openapi/static/dev routes"
     if path in {"/", "/health", "/ready", "/metrics"} or path.startswith("/app"):
         return "health/readiness routes"
-    if path.startswith(("/api/session", "/api/saas/signup")):
+    if path.startswith(("/api/session", "/api/saas/signup", "/api/saas/login", "/api/saas/password-reset")):
         return "session/auth routes"
     if path.startswith("/api/"):
         return "stable API routes"
@@ -389,19 +398,42 @@ def render_markdown(rows: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _render_json(rows: list[dict[str, str]]) -> str:
+    return json.dumps({"route_count": len(rows), "routes": rows}, indent=2, sort_keys=True) + "\n"
+
+
 def write_outputs(rows: list[dict[str, str]]) -> None:
     write_text_sync(DOC_OUT, render_markdown(rows))
     JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
-    write_text_sync(JSON_OUT, json.dumps({"route_count": len(rows), "routes": rows}, indent=2, sort_keys=True) + "\n")
+    write_text_sync(JSON_OUT, _render_json(rows))
+
+
+def check_outputs(rows: list[dict[str, str]]) -> int:
+    """Fail when the committed route-inventory JSON drifts from the live app.
+
+    The markdown doc embeds a generation timestamp, so only the deterministic
+    JSON artifact is compared.
+    """
+    expected = _render_json(rows)
+    current = JSON_OUT.read_text(encoding="utf-8") if JSON_OUT.exists() else ""
+    if current != expected:
+        print(f"Route inventory JSON is out of date: {JSON_OUT.relative_to(REPO)}", file=sys.stderr)
+        print("Run: python3 scripts/generate_route_inventory.py", file=sys.stderr)
+        return 1
+    print("Route inventory JSON is up to date")
+    return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate DataForge route inventory docs and JSON.")
     parser.add_argument("--dump-json", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--check", action="store_true", help="Exit non-zero if the committed JSON inventory is stale.")
     args = parser.parse_args()
     if args.dump_json:
         return _current_rows_json()
     rows = collect_route_rows()
+    if args.check:
+        return check_outputs(rows)
     write_outputs(rows)
     stable = sum(1 for row in rows if row["stable_or_experimental"] == "stable")
     experimental = sum(1 for row in rows if row["stable_or_experimental"] == "experimental")

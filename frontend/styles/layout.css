@@ -37,7 +37,7 @@
 
 .topbar {
   grid-area: unset;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-1);
@@ -53,7 +53,7 @@
 }
 
 .topbar-left {
-  display: none;
+  display: flex;
   align-items: center;
   gap: var(--space-3);
   flex: 0 0 auto;
@@ -72,6 +72,11 @@
 #btn-notifications,
 #btn-shortcuts {
   display: none;
+}
+
+#health-pill,
+#sidebar-collapse {
+  display: inline-flex !important;
 }
 
 /* ─── Topbar Search Input ─── */
@@ -940,7 +945,6 @@
   }
 
   .topbar {
-    display: flex;
     left: var(--space-4);
     right: var(--space-4);
     justify-content: space-between;
@@ -955,7 +959,12 @@
   }
 
   .topbar-right {
-    display: none;
+    display: flex;
+  }
+
+  .topbar-right #btn-theme-toggle,
+  .topbar-right #health-pill {
+    display: inline-flex;
   }
 
   .container {

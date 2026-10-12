@@ -5,6 +5,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   toggleAllFields,
+  analyzeURL,
+  applyAnalyzedFields,
   clearAnalysis,
   getSelectorsMap,
   getAnalyzedFields,
@@ -31,6 +33,8 @@ beforeEach(() => {
     <div id="analyze-error" class="hidden"></div>
     <div id="analyze-error-text"></div>
     <input id="inp-analyze-url" value="" />
+    <textarea id="inp-urls"></textarea>
+    <div id="schema-container"></div>
     <div id="ai-structure"></div>
     <div id="ai-records"></div>
     <div id="ai-antibot"></div>
@@ -64,6 +68,7 @@ beforeEach(() => {
       <button id="workflow-builder-run"></button>
     </div>
   `;
+  HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 
 afterEach(() => {
@@ -218,6 +223,62 @@ describe("renderAnalysisInfo()", () => {
     expect(document.getElementById("ai-structure").textContent).toContain("unknown");
     expect(document.getElementById("ai-records").textContent).toContain("?");
     expect(document.getElementById("ai-antibot").innerHTML).toContain("0%");
+  });
+});
+
+describe("analyzeURL()", () => {
+  it("requests a rendered preview and shows the fields available on the page", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        page_structure: "cards",
+        structure_confidence: 0.9,
+        estimated_record_count: 2,
+        anti_bot_score: 0.1,
+        fetch_time_ms: 120,
+        item_container: "article.record",
+        suggested_fields: [
+          { name: "product_name", type: "string", example_value: "Alpha", confidence: 0.95 },
+          { name: "price", type: "currency", example_value: "$12", confidence: 0.9 },
+        ],
+        acquisition_lineage: { state: "direct" },
+        empty_check: { is_empty: false },
+        url_intelligence: { recommended_mode: "direct_scrape", risk_level: "low" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    document.getElementById("inp-analyze-url").value = "https://example.com/catalog";
+    await analyzeURL();
+
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(request).toEqual({ url: "https://example.com/catalog", fetch_preview: true });
+    expect(document.getElementById("analyze-results").classList.contains("hidden")).toBe(false);
+    expect(document.getElementById("analyze-field-list").textContent).toContain("product_name");
+    expect(document.getElementById("analyze-field-list").textContent).toContain("price");
+  });
+
+  it("preserves inferred field types when applying analyzed fields to the schema", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        suggested_fields: [
+          { name: "population", type: "number", example_value: "84000", confidence: 0.9 },
+          { name: "rating", type: "rating", example_value: "4.5 / 5", confidence: 0.9 },
+          { name: "website", type: "url", example_value: "https://example.test", confidence: 0.9 },
+        ],
+        item_container: "article.record",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    document.getElementById("inp-analyze-url").value = "https://example.test/catalog";
+
+    await analyzeURL();
+    await applyAnalyzedFields();
+
+    expect(Array.from(document.querySelectorAll(".sf-type")).map((select) => select.value)).toEqual([
+      "number",
+      "rating",
+      "url",
+    ]);
   });
 });
 

@@ -26,20 +26,60 @@ DROP_ALERT_POINTS = 5.0
 TREND_KEEP_PER_SITE = 10
 
 
-def field_level_f1(extracted: list[dict], expected: list[dict], fields: list[str]) -> dict[str, dict[str, float]]:
+def field_level_f1(
+    extracted: list[dict],
+    expected: list[dict],
+    fields: list[str],
+    key_fields: list[str] | None = None,
+) -> dict[str, dict[str, float]]:
     """Per-field precision/recall/F1 between extracted and expected records.
 
-    A field counts as present when the record has a non-empty value for
-    that field. Field scores are computed over the union of records on
-    both sides.
+    Records are paired one-to-one by ``key_fields`` before field values are
+    compared. This prevents a permutation of values between two records from
+    incorrectly scoring as perfect merely because both sides contain the same
+    value set. A field counts as present when the record has a non-empty value.
     """
+    identity_fields = key_fields or (fields[:1] if fields else ["title"])
+
+    def record_key(record: dict, index: int) -> str:
+        for field in identity_fields:
+            value = record.get(field)
+            if value is not None and str(value).strip():
+                return str(value).strip().casefold()
+        # Missing identity values cannot be safely paired across sides.
+        return f"__unkeyed_{index}"
+
+    expected_by_key: dict[str, list[int]] = {}
+    for index, record in enumerate(expected):
+        expected_by_key.setdefault(record_key(record, index), []).append(index)
+    used_expected: set[int] = set()
+    matched_pairs: list[tuple[int, int]] = []
+    for extracted_index, record in enumerate(extracted):
+        candidates = expected_by_key.get(record_key(record, extracted_index), [])
+        expected_index = next((candidate for candidate in candidates if candidate not in used_expected), None)
+        if expected_index is not None:
+            used_expected.add(expected_index)
+            matched_pairs.append((expected_index, extracted_index))
+
+    def has_value(value: Any) -> bool:
+        return value is not None and bool(str(value).strip())
+
+    def normalise(value: Any) -> str:
+        return str(value).strip()
+
     result: dict[str, dict[str, float]] = {}
     for field in fields:
-        extracted_set = {str(r.get(field, "")).strip() for r in extracted}
-        expected_set = {str(r.get(field, "")).strip() for r in expected}
-        true_positives = len(extracted_set & expected_set)
-        false_positives = len(extracted_set - expected_set)
-        false_negatives = len(expected_set - extracted_set)
+        actual_cells = sum(1 for record in extracted if has_value(record.get(field)))
+        expected_cells = sum(1 for record in expected if has_value(record.get(field)))
+        true_positives = sum(
+            1
+            for expected_index, extracted_index in matched_pairs
+            if has_value(expected[expected_index].get(field))
+            and has_value(extracted[extracted_index].get(field))
+            and normalise(expected[expected_index].get(field)) == normalise(extracted[extracted_index].get(field))
+        )
+        false_positives = actual_cells - true_positives
+        false_negatives = expected_cells - true_positives
         precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) else 0.0
         recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) else 0.0
         f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) else 0.0
@@ -62,6 +102,7 @@ def write_diagnosis_card(
     extracted: list[dict],
     expected: list[dict],
     diagnosis_dir: Path = DIAGNOSIS_DIR,
+    key_fields: list[str] | None = None,
 ) -> Path:
     """Write a diagnosis card for a failing site and return its path.
 
@@ -82,7 +123,7 @@ def write_diagnosis_card(
         "failure_confidence": classification.confidence,
         "recovery_strategy": classification.recovery_strategy,
         "signals": classification.signals,
-        "field_level_f1": field_level_f1(extracted, expected, fields),
+        "field_level_f1": field_level_f1(extracted, expected, fields, key_fields=key_fields),
         "extracted_count": len(extracted),
         "expected_count": len(expected),
     }

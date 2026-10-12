@@ -2,7 +2,7 @@
 
 **This file is auto-generated. Do not edit by hand.**
 
-**Generated:** 2026-08-18 15:53:55 UTC
+**Generated:** 2026-10-08 18:37:48 UTC
 **Mode:** experimental routes **disabled** (`DATAFORGE_ENABLE_EXPERIMENTAL_ROUTES=false`).
 **Verification command:**
 
@@ -189,6 +189,7 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | POST | `/api/saas/email-verification/send` |
 | POST | `/api/saas/email-verification/verify` |
 | POST | `/api/saas/invitations/{invitation_id}/respond` |
+| POST | `/api/saas/login` |
 | POST | `/api/saas/orgs` |
 | POST | `/api/saas/orgs/{org_id}/invitations` |
 | POST | `/api/saas/password-reset/request` |
@@ -208,4 +209,4 @@ files is [`API_EXPERIMENTAL_DIFF.md`](API_EXPERIMENTAL_DIFF.md).
 | PUT | `/api/scheduled/{job_id}` |
 | PUT | `/api/workflows/{workflow_id}` |
 
-**Total routes:** 152
+**Total routes:** 153

@@ -1840,6 +1840,26 @@
 
 #view-new .analyzer-url-input {
   flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--control-height-lg);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+#view-new .analyzer-url-input::placeholder {
+  color: var(--ink-4);
+  opacity: 1;
+}
+
+#view-new .analyzer-url-input:focus {
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-focus) 22%, transparent);
 }
 
 #view-new #analyze-results {
@@ -2105,6 +2125,34 @@
 #view-new .filter-row input,
 #view-new .filter-row select {
   width: 100%;
+}
+
+#view-new .field-row input,
+#view-new .field-row select,
+#view-new .filter-row input,
+#view-new .filter-row select,
+#view-new #inp-name,
+#view-new #inp-topic,
+#view-new #inp-location,
+#view-new #inp-domain,
+#view-new #inp-origin-location,
+#view-new #inp-max-distance-km,
+#view-new #inp-discover-pages,
+#view-new #inp-max-per-domain,
+#view-new #inp-source-policy {
+  min-height: var(--control-height-lg);
+  border-color: var(--border-strong);
+}
+
+#view-new .field-row input:focus,
+#view-new .field-row select:focus,
+#view-new .filter-row input:focus,
+#view-new .filter-row select:focus,
+#view-new input:focus,
+#view-new select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--border-focus) 22%, transparent);
 }
 
 #view-new .btn-x {

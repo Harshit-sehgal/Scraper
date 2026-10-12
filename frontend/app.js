@@ -41,7 +41,7 @@ import {
   previewWorkflowFromBuilder,
   runWorkflowFromBuilder,
   showAuthProfileEntryNotice,
-} from "./js/analyzer.js";
+} from "./js/analyzer.js?v=7";
 import {
   addField,
   addFilter,
@@ -49,7 +49,7 @@ import {
   previewDiscovery,
   onFilterOpChange,
   submitJob,
-} from "./js/form.js";
+} from "./js/form.js?v=7";
 import { refreshCognition } from "./js/cognition.js";
 import { refreshDashboard, switchOperatorMode } from "./js/dashboard.js";
 import {

@@ -27,6 +27,8 @@ from app.page_profiler import (
     detect_page_structure,
     detect_value_patterns,
 )
+from app.selector_engine import extract_raw_from_selectors
+from app.url_value_classification import infer_dom_field_suggestions
 
 # ── Dataclass smoke tests ─────────────────────────────────────────────
 
@@ -203,6 +205,36 @@ def test_code_3letter_excludes_common_words() -> None:
     assert "FOR" not in upper
 
 
+def test_code_3letter_requires_uppercase_signal() -> None:
+    """Ordinary lowercase prose must not become an airport/code field."""
+    patterns = detect_value_patterns("It is far more than our abilities.")
+    assert patterns.codes_3letter == []
+
+
+def test_detect_cards_finds_generic_repeated_record_class() -> None:
+    """Repeated record classes win over broad layout wrappers without a site rule."""
+    from pathlib import Path
+
+    fixture = Path(__file__).parent / "fixtures" / "pages" / "395f96f5d719.html"
+    profile = detect_page_structure(fixture.read_text(encoding="utf-8"))
+    assert profile.structure_type == "cards"
+    assert profile.container_selector == "div.quote"
+
+
+def test_detect_cards_prefers_record_shape_over_more_repeated_child_nodes() -> None:
+    """A child field repeated multiple times per record must not become the container."""
+    html = """
+    <section>
+      <div class="record"><span class="value">Alpha one with descriptive text</span><span class="value">Alpha two with descriptive text</span></div>
+      <div class="record"><span class="value">Beta one with descriptive text</span><span class="value">Beta two with descriptive text</span></div>
+      <div class="record"><span class="value">Gamma one with descriptive text</span><span class="value">Gamma two with descriptive text</span></div>
+    </section>
+    """
+    profile = detect_page_structure(html)
+    assert profile.structure_type == "cards"
+    assert profile.container_selector == "div.record"
+
+
 def test_value_patterns_uses_text_not_tags() -> None:
     """detect_value_patterns operates on get_text(); tag/attribute strings
     must not leak into results."""
@@ -264,16 +296,125 @@ def test_detect_cards_structure() -> None:
     assert profile.structure_confidence > 0.7
 
 
+def test_detect_cards_returns_repeated_record_element_not_parent() -> None:
+    """Card discovery must scope extraction to repeated records, not the page shell."""
+    html = """
+    <main class="catalog-list">
+      <div class="catalog-entry"><h3 class="entry-title">Alpha</h3><span class="entry-price">$10</span></div>
+      <div class="catalog-entry"><h3 class="entry-title">Beta</h3><span class="entry-price">$20</span></div>
+      <div class="catalog-entry"><h3 class="entry-title">Gamma</h3><span class="entry-price">$30</span></div>
+    </main>
+    """
+    profile = detect_page_structure(html)
+    assert profile.structure_type == "cards"
+    assert profile.container_selector == "div.catalog-entry"
+
+
+def test_detect_cards_uses_common_class_when_one_record_has_extra_class() -> None:
+    """A featured/accepted record must still share the base card selector."""
+    html = """
+    <section>
+      <article class="answer-card accepted-answer"><h3>First answer with enough content</h3><p>Useful answer text.</p></article>
+      <article class="answer-card"><h3>Second answer with enough content</h3><p>Another answer text.</p></article>
+      <article class="answer-card"><h3>Third answer with enough content</h3><p>More answer text.</p></article>
+    </section>
+    """
+    profile = detect_page_structure(html)
+    assert profile.structure_type == "cards"
+    assert profile.container_selector == "article.answer-card"
+
+
+def test_detect_cards_accepts_two_repeated_records() -> None:
+    """Small result pages with two records still have an extractable container."""
+    html = """
+    <div class="results-list">
+      <div class="flight-card"><span class="name">Alpha Air</span><span class="amount">$100</span></div>
+      <div class="flight-card"><span class="name">Beta Air</span><span class="amount">$200</span></div>
+    </div>
+    """
+    profile = detect_page_structure(html)
+    assert profile.structure_type == "cards"
+    assert profile.container_selector == "div.flight-card"
+
+
+def test_detect_cards_prefers_record_over_nested_repeated_value_wrapper() -> None:
+    """A repeated price wrapper must not become the whole record container."""
+    from pathlib import Path
+
+    fixture = Path(__file__).parent / "fixtures" / "pages" / "9fdd63da3416.html"
+    profile = detect_page_structure(fixture.read_text(encoding="utf-8"))
+    assert profile.structure_type == "cards"
+    assert profile.container_selector == "article.product_pod"
+
+
 def test_detect_list_structure() -> None:
-    """A <ul> with ≥12 <li> children yields structure_type='list' above 0.7.
-    Confidence formula: min(0.5 + max_items/50, 0.8).  With 12 items:
-    0.5 + 12/50 = 0.74 > 0.7 dispatch threshold."""
+    """A <ul> with ≥12 <li> children yields a high-confidence list."""
     items = "".join(f"<li>Item number {i} description text here</li>" for i in range(12))
     html = f"<ul>{items}</ul>"
     profile = detect_page_structure(html)
     assert profile.structure_type == "list"
     assert profile.structure_confidence > 0.7
-    assert profile.container_selector == "ul li"
+    assert profile.container_selector == "ul:nth-of-type(1):not(ul ul) > li"
+
+
+def test_detect_list_structure_accepts_small_but_real_lists() -> None:
+    """A six-item list is still a useful generic extraction boundary."""
+    items = "".join(f"<li><h3>Item {i}</h3><a href='/item-{i}'>Open</a></li>" for i in range(6))
+    profile = detect_page_structure(f"<ul>{items}</ul>")
+    assert profile.structure_type == "list"
+    assert profile.container_selector == "ul:nth-of-type(1):not(ul ul) > li"
+
+
+def test_detect_list_structure_scopes_nested_lists_to_direct_records() -> None:
+    parents = "".join(f"<li>Parent {i}<ul><li>Child {i}-a</li><li>Child {i}-b</li></ul></li>" for i in range(6))
+    profile = detect_page_structure(f"<ul>{parents}</ul>")
+    assert profile.structure_type == "list"
+    assert profile.container_selector == "ul:nth-of-type(1):not(ul ul) > li"
+
+
+def test_detect_list_structure_scopes_flat_list_away_from_sibling_navigation() -> None:
+    """A selected data list must not merge sibling nav/footer list items."""
+    navigation = "".join(f"<li>Navigation {i}</li>" for i in range(8))
+    products = "".join(f"<li>Product {i} details</li>" for i in range(6))
+    footer = "".join(f"<li>Footer {i}</li>" for i in range(6))
+    html = f"""
+    <html><body>
+      <nav><ul>{navigation}</ul></nav>
+      <main><ul>{products}</ul></main>
+      <footer><ul>{footer}</ul></footer>
+    </body></html>
+    """
+
+    profile = detect_page_structure(html)
+    assert profile.structure_type == "list"
+    assert profile.container_selector == "main > ul > li"
+
+    fields = infer_dom_field_suggestions(html, profile.container_selector)
+    selectors = {
+        "item_container": profile.container_selector,
+        "fields": {field["name"]: {"selector": field["selector"], "type": field["type"]} for field in fields},
+    }
+    rows = extract_raw_from_selectors(html, selectors)
+    assert [row["text"] for row in rows] == [f"Product {i} details" for i in range(6)]
+
+
+def test_detect_list_structure_scopes_repeated_ancestor_wrappers() -> None:
+    """A repeated ancestor tag must not make the list selector ambiguous."""
+    first = "".join(f"<li>First {i} details</li>" for i in range(6))
+    second = "".join(f"<li>Second {i} details</li>" for i in range(6))
+    html = f"<html><body><main><ul>{first}</ul></main><main><ul>{second}</ul></main></body></html>"
+
+    profile = detect_page_structure(html)
+    assert profile.structure_type == "list"
+    assert profile.container_selector == "main:nth-of-type(1) > ul > li"
+
+    fields = infer_dom_field_suggestions(html, profile.container_selector)
+    selectors = {
+        "item_container": profile.container_selector,
+        "fields": {field["name"]: {"selector": field["selector"], "type": field["type"]} for field in fields},
+    }
+    rows = extract_raw_from_selectors(html, selectors)
+    assert [row["text"] for row in rows] == [f"First {i} details" for i in range(6)]
 
 
 def test_detect_key_value_dl_structure() -> None:
@@ -295,14 +436,8 @@ def test_detect_key_value_dl_structure() -> None:
 def test_detect_key_value_two_column_table() -> None:
     """A 2-column table with ≥5 rows passes the key_value 2-column branch.
 
-    The module hardcodes confidence=0.6 for the 2-column path, and the
-    dispatch requires ``> 0.6`` (strict).  With exactly 3 rows, confidence
-    is 0.6 which fails the strict check, so the structure falls through to
-    'mixed'.  With 5+ rows, the helper's internal row-count check passes
-    but the dispatch threshold still applies. This test verifies the
-    *actual* behaviour of the public function for a moderate-size 2-col
-    table — the current dispatch threshold rejects exactly-0.6 confidence,
-    so the result is 'mixed'.
+    A 2-column table without header cells is a labeled key/value page,
+    rather than a row-oriented data table.
     """
     html = """
     <table>
@@ -314,11 +449,9 @@ def test_detect_key_value_two_column_table() -> None:
     </table>
     """
     profile = detect_page_structure(html)
-    # Confidence is exactly 0.6; dispatch requires STRICT > 0.6.
-    # The helper finds the structure, but the public function rejects it.
-    # This documents the current behaviour — if the threshold is ever
-    # relaxed to >= 0.6 this test will catch the behavioural change.
-    assert profile.structure_type == "mixed"
+    assert profile.structure_type == "key_value"
+    assert profile.container_selector == "table"
+    assert profile.headers[:5] == ["Name", "Price", "Stock", "Color", "Size"]
 
 
 def test_detect_mixed_fallback_on_empty() -> None:

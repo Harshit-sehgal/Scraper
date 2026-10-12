@@ -47,6 +47,25 @@ class TestExtractionResult:
 
 
 class TestMergeCompositeRecords:
+    def test_does_not_use_repeated_boolean_as_record_identity(self) -> None:
+        schema = [
+            SchemaField(name="availability", field_type=FieldType.BOOLEAN),
+            SchemaField(name="name", field_type=FieldType.STRING),
+        ]
+        pass1 = [
+            {"availability": True, "name": "Item A", "record_score": 0.8},
+            {"availability": True, "name": "Item B", "record_score": 0.8},
+        ]
+        pass2 = [
+            {"availability": True, "name": "Item A", "description": "A", "record_score": 0.7},
+            {"availability": True, "name": "Item B", "description": "B", "record_score": 0.7},
+        ]
+
+        result = _merge_composite_records([pass1, pass2], schema)
+
+        assert {row["name"] for row in result} == {"Item A", "Item B"}
+        assert {row["description"] for row in result} == {"A", "B"}
+
     def test_returns_empty_for_empty_input(self) -> None:
         assert _merge_composite_records([], make_schema_field_list(["name"])) == []
 
