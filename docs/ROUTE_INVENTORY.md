@@ -2,7 +2,7 @@
 
 **Generated from the registered FastAPI app. Do not edit generated rows by hand.**
 
-**Generated:** 2026-08-19 16:21:06 UTC
+**Generated:** 2026-10-12 18:31:26 UTC
 **Command:** `python3 scripts/generate_route_inventory.py`
 
 This inventory distinguishes stable API routes, experimental API routes,
