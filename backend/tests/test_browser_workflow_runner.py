@@ -31,6 +31,11 @@ from app.models import (
     WorkflowStepType,
 )
 
+# Requires Playwright + a local fixture HTTP server; run under the browser tier
+# (`--run-browser`), not the unit job.
+pytestmark = pytest.mark.browser
+
+
 FIXTURE_PAGE = """<!DOCTYPE html>
 <html lang="en">
 <head><title>Fixture Form</title></head>
