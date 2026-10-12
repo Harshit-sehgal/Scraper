@@ -108,9 +108,7 @@ def classify(rel):
     # --- Binary / data ---
     if filename.endswith((".sqlite", ".db")):
         return "binary", "Database file", "No", ""
-    if (rel.startswith(("backend/data/", "data/"))) and any(
-        filename.endswith(ext) for ext in (".json", ".jsonl", ".lock")
-    ):
+    if (rel.startswith(("backend/data/", "data/"))) and any(filename.endswith(ext) for ext in (".json", ".jsonl", ".lock")):
         return "binary", "Data/storage file", "No", ""
 
     # --- Logs ---
@@ -121,8 +119,11 @@ def classify(rel):
 
 
 def main():
-    result = subprocess.run(  # noqa: S603 — REPO is a literal "." constant; trusted subprocess input
-        ["find", REPO, "-type", "f"], capture_output=True, text=True, check=False  # noqa: S607
+    result = subprocess.run(  # noqa: S603, S607 — REPO is a literal "." constant; trusted subprocess input
+        ["find", REPO, "-type", "f"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     all_paths = sorted(result.stdout.strip().split("\n"))
     rows = []
