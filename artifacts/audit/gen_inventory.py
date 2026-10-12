@@ -119,8 +119,8 @@ def classify(rel):
 
 
 def main():
-    result = subprocess.run(  # noqa: S603, S607 — REPO is a literal "." constant; trusted subprocess input
-        ["find", REPO, "-type", "f"],
+    result = subprocess.run(  # noqa: S603 — REPO is a literal "." constant; trusted subprocess input
+        ["find", REPO, "-type", "f"],  # noqa: S607 — fixed, non-user-controlled executable
         capture_output=True,
         text=True,
         check=False,
