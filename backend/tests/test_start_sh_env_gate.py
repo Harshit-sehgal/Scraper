@@ -47,6 +47,12 @@ def _make_fake_project(tmp_path: Path, *, with_example: bool) -> Path:
     venv = fake / ".venv" / "bin"
     venv.mkdir(parents=True)
     (venv / "activate").write_text("#!/bin/sh\n: ; echo stub\n")
+    # When the runner has every runtime dependency (incl. the Chromium build),
+    # start.sh's dependency check passes and it `exec`s uvicorn, which blocks
+    # forever. Provide a stub on PATH so the exec returns immediately.
+    stub_uvicorn = venv / "uvicorn"
+    stub_uvicorn.write_text("#!/bin/sh\nexit 0\n")
+    stub_uvicorn.chmod(0o755)
     # Start.sh uses ``cd $PROJECT_DIR`` and ``$PROJECT_DIR/scripts/start.sh``,
     # so symlink the real script into the fake tree.
     fake_scripts = fake / "scripts"
@@ -59,13 +65,18 @@ def _make_fake_project(tmp_path: Path, *, with_example: bool) -> Path:
 
 
 def _run(script_path: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    # Prepend the fake venv's bin so start.sh resolves the stub `uvicorn`
+    # instead of any real server binary on the CI runner.
+    fake_venv_bin = script_path.parents[1] / ".venv" / "bin"
+    run_env = dict(env)
+    run_env["PATH"] = f"{fake_venv_bin}:{run_env.get('PATH', '')}"
     return subprocess.run(
         [str(script_path)],
         check=False,
         capture_output=True,
         text=True,
         timeout=120,
-        env=env,
+        env=run_env,
     )
 
 
