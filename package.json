@@ -6,7 +6,7 @@
   "description": "DataForge Studio — frontend tooling (CSS lint)",
   "devDependencies": {
     "@playwright/test": "1.60.0",
-    "@vitest/ui": "^4.1.11",
+    "@vitest/ui": "4.1.11",
     "esbuild": "0.28.1",
     "eslint": "9.39.4",
     "globals": "17.6.0",
@@ -14,7 +14,7 @@
     "prettier": "3.8.3",
     "stylelint": "16.26.1",
     "stylelint-config-standard": "36.0.1",
-    "vitest": "^4.1.11"
+    "vitest": "4.1.11"
   },
   "scripts": {
     "build": "node frontend/build.mjs",
