@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from app.config import settings
 from app.workflow_repository import (
     JsonWorkflowRepository,
     SQLiteWorkflowRepository,
@@ -292,9 +293,16 @@ class TestFactorySelection:
 
     def setup_method(self) -> None:
         reset_workflow_repository()
+        # The factory falls back to ``settings.WORKFLOW_BACKEND`` when the env
+        # var is unset. A sibling test module that builds ``settings`` while
+        # DATAFORGE_WORKFLOW_BACKEND is set can leave that fallback polluted,
+        # making the "no env var -> json" assertion order-dependent. Pin it.
+        self._prev_workflow_backend = settings.WORKFLOW_BACKEND
+        settings.WORKFLOW_BACKEND = "json"
 
     def teardown_method(self) -> None:
         reset_workflow_repository()
+        settings.WORKFLOW_BACKEND = self._prev_workflow_backend
         os.environ.pop("DATAFORGE_WORKFLOW_BACKEND", None)
 
     def test_default_returns_json(self) -> None:

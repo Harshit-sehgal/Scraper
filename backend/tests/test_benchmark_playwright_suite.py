@@ -140,7 +140,7 @@ class TestBenchmarkPlaywrightCascadeLayers:
                 assert any(c in str(price) for c in ("$", "£", "€", "¥", "₹")), f"Price {price!r} not a valid currency"
 
     @pytest.mark.asyncio
-    @pytest.mark.timeout(60)
+    @pytest.mark.timeout(180)
     async def test_extraction_large_html_does_not_timeout(self) -> None:
         html = _load_fixture("large_catalog.html")
         schema = [

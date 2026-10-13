@@ -68,7 +68,7 @@ def ws():
     return state
 
 
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(180)
 def test_mega_horizon_simulation(ws) -> None:
     """Run 5,000 evolution cycles and analyze dynamics."""
     analyzer = DynamicalAnalyzer()

@@ -21,8 +21,13 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "start.sh"
+
+# start.sh provisions a venv, which is slower on CI runners than locally.
+pytestmark = pytest.mark.timeout(120)
 
 
 def _make_fake_project(tmp_path: Path, *, with_example: bool) -> Path:
@@ -59,7 +64,7 @@ def _run(script_path: Path, env: dict[str, str]) -> subprocess.CompletedProcess[
         check=False,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=120,
         env=env,
     )
 
